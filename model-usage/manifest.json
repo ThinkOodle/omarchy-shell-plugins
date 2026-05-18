@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "model-usage",
+  "name": "Model Usage",
+  "version": "0.1.0",
+  "author": "Noctalia model-usage prior art / Omarchy adaptation",
+  "license": "MIT",
+  "description": "Claude Code and Codex usage stats in a native Omarchy bar popup.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "Model Usage",
+    "description": "Shows AI coding assistant usage stats with a tabbed popup panel.",
+    "category": "AI",
+    "allowMultiple": false,
+    "defaults": {
+      "providers": {
+        "claude": {
+          "enabled": true,
+          "statsPath": "~/.claude/stats-cache.json",
+          "credentialsPath": "~/.claude/.credentials.json"
+        },
+        "codex": {
+          "enabled": true
+        }
+      },
+      "refreshIntervalSec": 300
+    },
+    "schema": [
+      { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 30, "max": 600, "step": 30 }
+    ]
+  }
+}
