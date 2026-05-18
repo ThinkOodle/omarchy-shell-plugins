@@ -4,14 +4,14 @@ Screen-tools bar widget for `omarchy-shell`. Click the toolbar icon and pick a t
 
 - **Color** — pixel color picker with HEX/RGB/HSL/HSV copy-buttons and a persistent history
 - **Annotate** — region screenshot opened in the configured editor (defaults to `satty`)
-- **Measure** — *coming soon* (overlay router stub is in place)
-- **Pin** — *coming soon*
+- **Measure** — full-screen ruler overlay; drag to measure (Alt to constrain), pin multiple measurements, copy as `Wpx (W×H)`
+- **Pin** — region screenshot floated on top of the desktop, draggable + resizable + copy-to-clipboard; multiple pins stack
 - **Palette** — extract dominant colors from a region (ImageMagick) with history
 - **OCR** — region text extraction via tesseract (`omarchy-capture-text-extraction`)
 - **QR** — decode QR codes / barcodes via zbar with "Open" action for URLs
 - **Lens** — reverse-image-search a region (uploads to a share host, opens the search URL)
 - **Record** — MP4 region recording (toggle via `omarchy-capture-screenrecording`) or GIF
-- **Mirror** — *coming soon*
+- **Mirror** — floating webcam preview with flip, aspect toggle, and camera switch
 
 A fresh color pick opens a centered result overlay (ESC and outside-click dismiss it).
 Subsequent picks join a "History" strip of circular swatches. The same machinery feeds
@@ -103,17 +103,22 @@ Bind to a Hyprland keybind for quick keyboard access.
 omarchy-screen-toolkit/
 ├── manifest.json
 ├── BarWidget.qml      # bar icon + main popup + result overlay
-├── Overlay.qml        # router stub for upcoming pin/measure/mirror
+├── Overlay.qml        # router that mounts pin / measure / mirror slots
 ├── bin/
 │   ├── ost-color-pick
 │   ├── ost-palette
 │   ├── ost-qr
 │   ├── ost-lens
+│   ├── ost-pin-region
 │   └── ost-record-gif
-└── components/        # future overlay sub-tools
+└── components/
+    ├── Pin.qml        # floating image pin (per-slot, additive)
+    ├── Measure.qml    # full-screen measurement overlay (singleton)
+    └── Mirror.qml     # floating webcam mirror (singleton)
 ```
 
 ## Status
 
-Working: color, annotate, palette, OCR, QR, Lens, mp4 record, gif record.
-Stub-only (router accepts the payload, no UI yet): pin, measure, mirror.
+All ten tools are wired up. Pin / Measure / Mirror live in `components/`
+and are mounted on demand by `Overlay.qml`; closing the last overlay
+asks the shell to hide the plugin so the next IPC `toggle` opens cleanly.

@@ -1,0 +1,42 @@
+#!/bin/bash
+set -u
+
+# Capture a region screenshot and ask the screen-toolkit overlay to pin it
+# (a floating, draggable, resizable image window). The actual pin UI lives in
+# the QML overlay; this script does the slurp+grim and then forwards the
+# resulting file path to the shell via the summon IPC.
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screen-toolkit"
+mkdir -p "$RUNTIME_DIR"
+
+GEOM=$(slurp 2>/dev/null) || exit 0
+[[ -z $GEOM ]] && exit 0
+
+# A unique timestamped file keeps multiple concurrent pins from clobbering
+# each other while the overlay still holds a reference to a previous image.
+OUT="$RUNTIME_DIR/pin-$(date +%s%N).png"
+
+if ! grim -g "$GEOM" "$OUT" 2>/dev/null; then
+  exit 1
+fi
+
+# Pull the captured width so the overlay can size itself sensibly. grim
+# preserves source pixel dimensions, so this matches what we'll display.
+# ImageMagick 7's `magick identify` is preferred (matches the palette
+# script's `magick` usage); fall back to the older `identify` binary, and
+# finally to a sane default if neither is installed.
+if command -v magick >/dev/null 2>&1; then
+  read -r W H < <(magick identify -format '%w %h' "$OUT" 2>/dev/null || echo "")
+elif command -v identify >/dev/null 2>&1; then
+  read -r W H < <(identify -format '%w %h' "$OUT" 2>/dev/null || echo "")
+fi
+if [[ -z ${W:-} || -z ${H:-} ]]; then
+  W=600; H=400
+fi
+
+# The script controls $OUT (timestamped basename under a known runtime
+# dir), so no path needs JSON-escaping beyond the literal quotes —
+# avoids a jq dependency on the pin path.
+PAYLOAD=$(printf '{"tool":"pin","path":"%s","w":%d,"h":%d}' "$OUT" "$W" "$H")
+
+omarchy-shell shell summon omarchy-screen-toolkit "$PAYLOAD" >/dev/null
