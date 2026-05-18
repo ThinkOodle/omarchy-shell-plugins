@@ -1,0 +1,138 @@
+#!/bin/bash
+set -u
+
+# omarchy-screen-toolkit: toggle a region screen-recording that finalizes as a
+# GIF. First invocation picks a region with slurp and starts gpu-screen-recorder
+# (mp4 intermediate). Second invocation stops the recorder and runs ffmpeg's
+# two-pass palettegen/paletteuse to produce a clean GIF in the user's video
+# directory.
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screen-toolkit"
+mkdir -p "$RUNTIME_DIR"
+PID_FILE="$RUNTIME_DIR/gif.pid"
+MP4_FILE="$RUNTIME_DIR/gif.mp4"
+
+[[ -f ~/.config/user-dirs.dirs ]] && . ~/.config/user-dirs.dirs
+OUTPUT_DIR="${OMARCHY_SCREENRECORD_DIR:-${XDG_VIDEOS_DIR:-$HOME/Videos}}"
+mkdir -p "$OUTPUT_DIR"
+
+GIF_FPS="${OST_GIF_FPS:-15}"
+GIF_MAX_SECS="${OST_GIF_MAX_SECS:-30}"
+
+notify() {
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "$@"
+  else
+    notify-send -a omarchy-screen-toolkit "$@"
+  fi
+}
+
+finalize_gif() {
+  local mp4="$1"
+  local out="$OUTPUT_DIR/screen-recording-$(date +'%Y-%m-%d_%H-%M-%S').gif"
+  local palette="$RUNTIME_DIR/gif-palette.png"
+
+  ffmpeg -y -i "$mp4" -vf "fps=${GIF_FPS},scale=iw:-1:flags=lanczos,palettegen" \
+    "$palette" -loglevel error 2>/dev/null
+  ffmpeg -y -i "$mp4" -i "$palette" -filter_complex \
+    "fps=${GIF_FPS},scale=iw:-1:flags=lanczos[x];[x][1:v]paletteuse" \
+    "$out" -loglevel error 2>/dev/null
+
+  rm -f "$palette"
+  if [[ -f $out ]]; then
+    wl-copy --type image/gif <"$out" 2>/dev/null || true
+    notify -g 󰵸 "Screen recording saved" "$out" -t 6000
+    echo "$out"
+  else
+    notify "GIF encoding failed" -u critical -t 4000
+  fi
+}
+
+# -- stop branch ---------------------------------------------------------------
+if [[ -f $PID_FILE ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+  PID=$(cat "$PID_FILE")
+  kill -SIGINT "$PID" 2>/dev/null
+
+  for _ in {1..50}; do
+    kill -0 "$PID" 2>/dev/null || break
+    sleep 0.1
+  done
+  kill -0 "$PID" 2>/dev/null && kill -9 "$PID" 2>/dev/null
+
+  rm -f "$PID_FILE"
+  omarchy-shell bar refreshScreenRecording >/dev/null 2>&1 || true
+
+  if [[ -f $MP4_FILE ]]; then
+    finalize_gif "$MP4_FILE"
+    rm -f "$MP4_FILE"
+  fi
+  exit 0
+fi
+
+# -- start branch --------------------------------------------------------------
+if pkill -x slurp 2>/dev/null; then exit 0; fi
+
+get_rectangles() {
+  local ws
+  ws=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true) | .activeWorkspace.id')
+  hyprctl monitors -j | jq -r --arg ws "$ws" '
+    .[] | select(.activeWorkspace.id == ($ws | tonumber)) |
+    "\(.x),\(.y) \(.width / .scale | floor)x\(.height / .scale | floor)"'
+  hyprctl clients -j | jq -r --arg ws "$ws" '
+    .[] | select(.workspace.id == ($ws | tonumber)) |
+    "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
+}
+
+RECTS=$(get_rectangles)
+hyprpicker -r -z >/dev/null 2>&1 &
+PICKER_PID=$!
+trap '[[ -n ${PICKER_PID:-} ]] && kill "$PICKER_PID" 2>/dev/null' EXIT
+sleep 0.1
+SELECTION=$(echo "$RECTS" | slurp 2>/dev/null) || exit 0
+kill "$PICKER_PID" 2>/dev/null
+trap - EXIT
+
+[[ -z $SELECTION ]] && exit 0
+
+# A bare click snaps to the rectangle under the cursor, same as the omarchy
+# screenshot/record flows.
+if [[ $SELECTION =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]([0-9]+)x([0-9]+)$ ]]; then
+  sx=${BASH_REMATCH[1]} sy=${BASH_REMATCH[2]}
+  sw=${BASH_REMATCH[3]} sh=${BASH_REMATCH[4]}
+  if ((sw * sh < 20)); then
+    while IFS= read -r rect; do
+      [[ $rect =~ ^(-?[0-9]+),(-?[0-9]+)[[:space:]]([0-9]+)x([0-9]+) ]] || continue
+      rx=${BASH_REMATCH[1]} ry=${BASH_REMATCH[2]}
+      rw=${BASH_REMATCH[3]} rh=${BASH_REMATCH[4]}
+      if ((sx >= rx && sx < rx + rw && sy >= ry && sy < ry + rh)); then
+        sx=$rx sy=$ry sw=$rw sh=$rh
+        break
+      fi
+    done <<<"$RECTS"
+  fi
+  REGION="${sw}x${sh}+${sx}+${sy}"
+else
+  exit 1
+fi
+
+# Even-dimensioned region — h264 encoders reject odd width/height.
+EVEN_W=$(( sw - (sw % 2) ))
+EVEN_H=$(( sh - (sh % 2) ))
+REGION="${EVEN_W}x${EVEN_H}+${sx}+${sy}"
+
+gpu-screen-recorder -w "$REGION" -k auto -f "$GIF_FPS" -fm cfr \
+  -fallback-cpu-encoding yes -o "$MP4_FILE" >/dev/null 2>&1 &
+PID=$!
+echo "$PID" >"$PID_FILE"
+omarchy-shell bar refreshScreenRecording >/dev/null 2>&1 || true
+
+# Auto-stop after the max so a forgotten recording doesn't grow unbounded.
+(
+  for _ in $(seq 1 "$GIF_MAX_SECS"); do
+    kill -0 "$PID" 2>/dev/null || exit 0
+    sleep 1
+  done
+  kill -0 "$PID" 2>/dev/null && "$0"
+) >/dev/null 2>&1 &
+
+notify -g  "GIF recording started" "Click the toolkit icon again to stop (max ${GIF_MAX_SECS}s)" -t 3000

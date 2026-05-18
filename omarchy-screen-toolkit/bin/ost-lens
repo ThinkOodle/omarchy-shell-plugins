@@ -1,0 +1,51 @@
+#!/bin/bash
+set -u
+
+# omarchy-screen-toolkit: reverse-image-search a screen region.
+# Capture a region, upload to a configurable share host (default 0x0.st),
+# then open the search engine URL with the upload URL appended. The default
+# search engine is Google Lens's upload-by-URL endpoint.
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screen-toolkit"
+mkdir -p "$RUNTIME_DIR"
+
+if pkill -x slurp 2>/dev/null; then exit 0; fi
+
+SHARE_HOST="${OST_SHARE_HOST:-https://0x0.st}"
+SEARCH_URL="${OST_SEARCH_URL:-https://www.google.com/searchbyimage?image_url=}"
+
+hyprpicker -r -z >/dev/null 2>&1 &
+PICKER_PID=$!
+trap '[[ -n ${PICKER_PID:-} ]] && kill "$PICKER_PID" 2>/dev/null; rm -f "${TMP:-}"' EXIT
+sleep 0.1
+
+SELECTION=$(slurp 2>/dev/null) || exit 0
+[[ -z $SELECTION ]] && exit 0
+
+TMP=$(mktemp --suffix=.png) || exit 1
+grim -g "$SELECTION" "$TMP" || exit 1
+
+# 0x0.st accepts an unauthenticated POST with `file=`; user-set hosts can
+# override via OST_SHARE_HOST. We bail visibly if the upload doesn't return
+# a URL so the user knows why the browser didn't open.
+URL=$(curl -fsSL -F "file=@${TMP}" "$SHARE_HOST" 2>/dev/null)
+
+if [[ -z $URL || $URL != http* ]]; then
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "Reverse image search" "Upload to $SHARE_HOST failed" -t 4000
+  else
+    notify-send -a omarchy-screen-toolkit "Reverse image search" "Upload to $SHARE_HOST failed" -t 4000
+  fi
+  exit 1
+fi
+
+printf '%s' "$URL" >"$RUNTIME_DIR/lens.last"
+
+ENCODED=$(printf '%s' "$URL" | jq -sRr @uri 2>/dev/null || printf '%s' "$URL")
+xdg-open "${SEARCH_URL}${ENCODED}" >/dev/null 2>&1 &
+
+if command -v omarchy-notification-send >/dev/null 2>&1; then
+  omarchy-notification-send -g 󰍉 "Searching with image" "$URL" -t 3000
+else
+  notify-send -a omarchy-screen-toolkit "Searching with image" "$URL" -t 3000
+fi

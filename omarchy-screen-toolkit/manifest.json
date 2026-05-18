@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy-screen-toolkit",
+  "name": "Screen Toolkit",
+  "version": "0.1.0",
+  "author": "thinkoodle",
+  "description": "Color picker, palette, OCR, QR, Lens, screenshot, screen record, pin, measure, and webcam mirror in one bar widget.",
+  "kinds": ["bar-widget", "overlay"],
+  "activation": "on-demand",
+  "keepLoaded": true,
+  "entryPoints": {
+    "barWidget": "BarWidget.qml",
+    "overlay": "Overlay.qml"
+  },
+  "barWidget": {
+    "displayName": "Screen toolkit",
+    "description": "Color, OCR, QR, capture, pin, measure, mirror",
+    "category": "Capture",
+    "allowMultiple": false,
+    "defaults": {
+      "screenshotPath": "",
+      "videoPath": "",
+      "filenameFormat": "",
+      "ocrLang": "eng",
+      "installedLangs": ["eng"],
+      "translateAvailable": false,
+      "gifMaxSeconds": 30,
+      "recorder": "",
+      "copyRecordingToClipboard": false,
+      "skipRecordingConfirmation": false,
+      "searchEngineUrl": "https://www.google.com/searchbyimage?image_url=",
+      "shareHost": "",
+      "shareApiKey": "",
+      "shareExpiry": "7d",
+      "colorHistory": [],
+      "paletteHistory": []
+    }
+  }
+}

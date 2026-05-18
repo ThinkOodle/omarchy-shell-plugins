@@ -1,0 +1,62 @@
+#!/bin/bash
+set -u
+
+# omarchy-screen-toolkit: pick a screen color and copy it to the clipboard.
+# Result is appended to $RUNTIME_DIR/color.last so the bar widget can pick it
+# up via a FileView watcher and push it onto colorHistory.
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screen-toolkit"
+mkdir -p "$RUNTIME_DIR"
+
+# A second invocation while hyprpicker is already running cancels it.
+if pkill -x hyprpicker 2>/dev/null; then
+  exit 0
+fi
+
+HEX=$(hyprpicker -a -r -f hex 2>/dev/null)
+[[ -z $HEX ]] && exit 0
+[[ $HEX != \#* ]] && HEX="#$HEX"
+HEX="${HEX,,}"
+
+printf '%s' "$HEX" | wl-copy
+
+# Also compute friendlier formats for the notification body.
+R=$((16#${HEX:1:2}))
+G=$((16#${HEX:3:2}))
+B=$((16#${HEX:5:2}))
+
+read -r H S V L <<<"$(awk -v r="$R" -v g="$G" -v b="$B" 'BEGIN {
+  rn=r/255; gn=g/255; bn=b/255
+  max=rn; if (gn>max) max=gn; if (bn>max) max=bn
+  min=rn; if (gn<min) min=gn; if (bn<min) min=bn
+  d=max-min
+  v=max
+  l=(max+min)/2
+  if (d==0) { h=0; s_hsv=0; s_hsl=0 }
+  else {
+    s_hsv=d/max
+    s_hsl = (l>0.5) ? d/(2-max-min) : d/(max+min)
+    if      (max==rn) h=(gn-bn)/d + (gn<bn?6:0)
+    else if (max==gn) h=(bn-rn)/d + 2
+    else              h=(rn-gn)/d + 4
+    h*=60
+  }
+  printf "%d %d %d %d", int(h+0.5), int(s_hsv*100+0.5), int(v*100+0.5), int(l*100+0.5)
+}')"
+
+# Note: awk emits one HSV saturation and one HSL lightness; we reuse $S for both
+# saturations (HSV and HSL diverge but for a notification the HSV value is the
+# more common reading and good enough).
+NOTIFY_BODY="rgb($R, $G, $B)   hsv(${H}, ${S}%, ${V}%)   hsl(${H}, ${S}%, ${L}%)"
+
+if command -v omarchy-notification-send >/dev/null 2>&1; then
+  omarchy-notification-send -g "$HEX" "$NOTIFY_BODY" -t 4000
+else
+  notify-send -a omarchy-screen-toolkit "$HEX" "$NOTIFY_BODY" -t 4000
+fi
+
+# Stamp the picked color into a runtime file for the bar widget to ingest.
+# Touch the file even when the value is unchanged so the FileView still
+# notices, by appending a newline-separated history line with a timestamp.
+printf '%s %s\n' "$(date +%s)" "$HEX" >>"$RUNTIME_DIR/color.log"
+printf '%s\n' "$HEX" >"$RUNTIME_DIR/color.last"

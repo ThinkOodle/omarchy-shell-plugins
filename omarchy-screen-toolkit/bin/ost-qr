@@ -1,0 +1,48 @@
+#!/bin/bash
+set -u
+
+# omarchy-screen-toolkit: scan a screen region for QR codes / barcodes.
+# Uses slurp + grim for the region, zbarimg for decoding. Decoded text lands
+# on the clipboard and in a runtime sentinel; if the result looks like a URL
+# the notification offers an "Open" action.
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}/omarchy-screen-toolkit"
+mkdir -p "$RUNTIME_DIR"
+
+if pkill -x slurp 2>/dev/null; then exit 0; fi
+
+hyprpicker -r -z >/dev/null 2>&1 &
+PICKER_PID=$!
+trap '[[ -n ${PICKER_PID:-} ]] && kill "$PICKER_PID" 2>/dev/null' EXIT
+sleep 0.1
+
+SELECTION=$(slurp 2>/dev/null) || exit 0
+[[ -z $SELECTION ]] && exit 0
+
+# Pipe straight through zbarimg's stdin. --raw drops the symbology prefix so
+# the clipboard has the bare payload; -q suppresses summary lines.
+TEXT=$(grim -g "$SELECTION" - | zbarimg --raw -q PNG:- 2>/dev/null) || TEXT=""
+TEXT="${TEXT%$'\n'}"
+
+if [[ -z $TEXT ]]; then
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "No QR / barcode detected" -t 3000
+  else
+    notify-send -a omarchy-screen-toolkit "No QR / barcode detected" -t 3000
+  fi
+  exit 1
+fi
+
+printf '%s' "$TEXT" | wl-copy
+printf '%s' "$TEXT" >"$RUNTIME_DIR/qr.last"
+
+if [[ $TEXT =~ ^(https?|mailto|tel|wss?|ftps?):// ]]; then
+  ACTION=$(notify-send -a omarchy-action "QR decoded" "$TEXT" -t 8000 -A "open=Open") || true
+  [[ $ACTION == "open" ]] && xdg-open "$TEXT" >/dev/null 2>&1 &
+else
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "QR decoded" "$TEXT" -t 5000
+  else
+    notify-send -a omarchy-screen-toolkit "QR decoded" "$TEXT" -t 5000
+  fi
+fi
