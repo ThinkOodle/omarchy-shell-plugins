@@ -51,6 +51,7 @@ Item {
   property string syncFileName: String(setting("syncFileName", ""))
   property string syncDeviceId: String(setting("syncDeviceId", ""))
   readonly property string home: Quickshell.env("HOME") || ""
+  property string detectedHostname: ""
   readonly property string syncEffectiveDir: expandPath(syncDir)
   readonly property string syncEffectiveFileName: safeSnapshotFileName(syncFileName, syncDeviceId)
   readonly property string syncEffectiveDeviceId: safeDeviceId(syncDeviceId || syncEffectiveFileName.replace(/\.json$/i, ""))
@@ -136,6 +137,14 @@ Item {
     watchChanges: false
     atomicWrites: true
     printErrors: false
+  }
+
+  FileView {
+    id: hostnameFile
+    path: "/etc/hostname"
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.detectedHostname = String(text() || "").trim()
   }
 
   onEnabledProvidersChanged: {
@@ -229,7 +238,7 @@ Item {
 
   function safeDeviceId(raw) {
     var value = String(raw || "").trim()
-    if (value === "") value = Quickshell.env("HOSTNAME") || Quickshell.env("USER") || "device"
+    if (value === "") value = Quickshell.env("HOSTNAME") || root.detectedHostname || Quickshell.env("HOST") || Quickshell.env("USER") || "device"
     value = value.replace(/[^A-Za-z0-9_.-]+/g, "-").replace(/^[._-]+|[._-]+$/g, "")
     if (value === "") value = "device"
     return value.length > 80 ? value.substring(0, 80) : value
