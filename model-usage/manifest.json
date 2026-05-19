@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "model-usage",
   "name": "Model Usage",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Noctalia model-usage prior art / Omarchy adaptation",
   "license": "MIT",
   "description": "Claude Code and Codex usage stats in a native Omarchy bar popup.",
@@ -27,10 +27,16 @@
           "enabled": true
         }
       },
-      "refreshIntervalSec": 300
+      "refreshIntervalSec": 300,
+      "syncMode": "Off",
+      "syncDir": "",
+      "syncFileName": ""
     },
     "schema": [
-      { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 30, "max": 600, "step": 30 }
+      { "key": "refreshIntervalSec", "type": "integer", "label": "Refresh interval (seconds)", "min": 30, "max": 600, "step": 30, "defaultValue": 300 },
+      { "key": "syncMode", "type": "enum", "label": "Synced aggregation", "options": ["Off", "On"], "defaultValue": "Off", "description": "When On, write this machine's local usage snapshot and merge snapshots from other machines." },
+      { "key": "syncDir", "type": "path", "label": "Sync folder", "defaultValue": "", "description": "A folder synced by Syncthing, Dropbox, rsync, etc." },
+      { "key": "syncFileName", "type": "string", "label": "Snapshot file name", "defaultValue": "", "description": "Optional. Defaults to <hostname>.json. Use a different file name on each machine, such as laptop.json or desktop.json." }
     ]
   }
 }

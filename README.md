@@ -15,6 +15,7 @@ Features:
 - 5-hour / weekly rate-limit usage
 - Pace indicators for reserve/deficit against reset timing
 - Local usage summaries for today, the last 7 days, and all time
+- Optional synced aggregation across multiple machines
 - Keyboard controls: `←`/`→` or `h`/`l` to switch tabs, `j`/`k` to scroll, `r` to refresh, `Esc` to close
 
 ## Install locally
@@ -31,3 +32,22 @@ If the plugin already exists, remove it first:
 ```bash
 rm -rf ~/.config/omarchy/plugins/model-usage
 ```
+
+## Optional synced aggregation
+
+The plugin can aggregate local usage stats across multiple machines while leaving provider rate limits account-authoritative/local.
+
+Set **Synced aggregation** to **On**, set **Sync folder** to a folder that is synced between machines (Syncthing, Dropbox, rsync, etc.), and optionally set **Snapshot file name**. Each machine writes one JSON snapshot into that folder and reads all snapshots back for merged today / 7-day / all-time totals.
+
+Optional inline config example:
+
+```json
+{
+  "id": "model-usage",
+  "syncMode": "On",
+  "syncDir": "~/Sync/omarchy-model-usage",
+  "syncFileName": "laptop.json"
+}
+```
+
+Use a different `syncFileName` per machine, or leave it blank to use `<hostname>.json`.

@@ -36,6 +36,7 @@ Item {
     property string tierLabel: ""
     property string authHelpText: "Run `claude auth login` to restore authoritative usage."
     property bool hasLocalStats: true
+    property bool hasProjectStats: false
 
     property string oauthAccessToken: ""
     property double oauthExpiresAtMs: 0
@@ -59,12 +60,9 @@ Item {
         id: statsFile
         path: root.resolvePath(root.providerSettings?.statsPath ?? "~/.claude/stats-cache.json")
         watchChanges: true
+        printErrors: false
         onFileChanged: reload()
         onLoaded: root.parseStats(text())
-        onLoadFailed: error => {
-            if (error === FileViewError.FileNotFound)
-                console.error("model-usage/claude", "stats-cache.json not found at", statsFile.path);
-        }
     }
 
     FileView {
@@ -89,6 +87,24 @@ Item {
             if (error === FileViewError.FileNotFound)
                 console.error("model-usage/claude", "credentials.json not found at", credentialsFile.path);
         }
+    }
+
+    Process {
+        id: projectScanner
+        running: false
+        command: ["bash", "-c", "dir=$0; command -v rg >/dev/null || exit 0; [[ -d \"$dir\" ]] || exit 0; rg --json -e '\"usage\":' \"$dir\" || true", root.resolvePath(root.providerSettings?.projectsPath ?? "~/.claude/projects")]
+
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: root.parseProjectUsage(text)
+        }
+
+        stderr: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: if (text.trim() !== "") console.warn("model-usage/claude", text.trim())
+        }
+
+        onExited: root.finishRefresh()
     }
 
     Timer {
@@ -132,7 +148,147 @@ Item {
         }
     }
 
+    function usageToken(usage, snakeKey, camelKey) {
+        if (!usage)
+            return 0;
+        const value = usage[snakeKey] ?? usage[camelKey] ?? 0;
+        const n = Number(value || 0);
+        return isFinite(n) ? Math.round(n) : 0;
+    }
+
+    function localDateFromTimestamp(value) {
+        if (value === undefined || value === null)
+            return localDateString();
+        if (typeof value === "number") {
+            const ms = value > 10000000000 ? value : value * 1000;
+            const d = new Date(ms);
+            if (!isNaN(d.getTime()))
+                return dateString(d);
+        }
+        const parsed = new Date(String(value));
+        if (!isNaN(parsed.getTime()))
+            return dateString(parsed);
+        return localDateString();
+    }
+
+    function dateString(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, "0");
+        const d = String(date.getDate()).padStart(2, "0");
+        return y + "-" + m + "-" + d;
+    }
+
+    function recentDateStrings() {
+        const out = [];
+        for (let offset = 6; offset >= 0; offset--) {
+            const d = new Date();
+            d.setDate(d.getDate() - offset);
+            out.push(dateString(d));
+        }
+        return out;
+    }
+
+    function parseProjectUsage(rgOutput) {
+        try {
+            const today = localDateString();
+            const recentDates = recentDateStrings();
+            const recent = {};
+            for (let i = 0; i < recentDates.length; i++)
+                recent[recentDates[i]] = { date: recentDates[i], messageCount: 0 };
+
+            const seen = {};
+            const sessions = {};
+            const todaySessionsMap = {};
+            const todayTokens = {};
+            const usageByModel = {};
+            let prompts = 0;
+            let todayPromptCount = 0;
+            let todayTokenTotal = 0;
+
+            const lines = String(rgOutput || "").split("\n");
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line)
+                    continue;
+
+                let event;
+                try { event = JSON.parse(line); } catch (e) { continue; }
+                if (event.type !== "match")
+                    continue;
+
+                const text = event.data?.lines?.text ?? "";
+                const path = event.data?.path?.text ?? "claude-project";
+                let entry;
+                try { entry = JSON.parse(text); } catch (e) { continue; }
+
+                const message = entry.message && typeof entry.message === "object" ? entry.message : {};
+                if (entry.type !== "assistant" && message.role !== "assistant")
+                    continue;
+
+                const usage = message.usage || entry.usage;
+                if (!usage)
+                    continue;
+
+                const messageId = message.id || entry.messageId || "";
+                const uniqueKey = messageId ? String(messageId) : (path + ":" + String(entry.uuid || entry.requestId || i));
+                if (seen[uniqueKey])
+                    continue;
+                seen[uniqueKey] = true;
+
+                const inputTokens = usageToken(usage, "input_tokens", "inputTokens");
+                const outputTokens = usageToken(usage, "output_tokens", "outputTokens");
+                const cacheRead = usageToken(usage, "cache_read_input_tokens", "cacheReadInputTokens");
+                const cacheWrite = usageToken(usage, "cache_creation_input_tokens", "cacheCreationInputTokens");
+                const total = inputTokens + outputTokens + cacheRead + cacheWrite;
+                if (total <= 0)
+                    continue;
+
+                const model = String(message.model || entry.model || "claude");
+                const day = localDateFromTimestamp(entry.timestamp || message.timestamp);
+                const sessionKey = String(entry.sessionId || path);
+                sessions[sessionKey] = true;
+                prompts++;
+
+                const bucket = usageByModel[model] || { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
+                bucket.inputTokens += inputTokens;
+                bucket.outputTokens += outputTokens;
+                bucket.cacheReadInputTokens += cacheRead;
+                bucket.cacheCreationInputTokens += cacheWrite;
+                usageByModel[model] = bucket;
+
+                if (recent[day])
+                    recent[day].messageCount += total;
+
+                if (day === today) {
+                    todayPromptCount++;
+                    todaySessionsMap[sessionKey] = true;
+                    todayTokenTotal += total;
+                    todayTokens[model] = (todayTokens[model] || 0) + total;
+                }
+            }
+
+            if (prompts === 0)
+                return;
+
+            root.hasProjectStats = true;
+            root.todayPrompts = todayPromptCount;
+            root.todaySessions = Object.keys(todaySessionsMap).length;
+            root.todayTotalTokens = todayTokenTotal;
+            root.todayTokensByModel = todayTokens;
+            root.recentDays = recentDates.map(d => recent[d]);
+            root.modelUsage = usageByModel;
+            root.totalPrompts = prompts;
+            root.totalSessions = Object.keys(sessions).length;
+            root.dailyActivity = root.recentDays;
+            root.ready = true;
+        } catch (e) {
+            console.error("model-usage/claude", "Failed to parse project usage:", e);
+        }
+    }
+
     function parseHistory(content) {
+        if (root.hasProjectStats)
+            return;
         try {
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -184,7 +340,8 @@ Item {
             root.tierLabel = formatTier();
 
             if (root.oauthAccessToken && !root.oauthTokenExpired()) {
-                root.clearUsageStatus();
+                if (root.usageStatusText === "Waiting for auth")
+                    root.clearUsageStatus();
                 root.probeRateLimits(false);
             } else if (!root.oauthAccessToken) {
                 root.usageStatusText = "Waiting for auth";
@@ -346,9 +503,14 @@ Item {
             }
 
             const body = xhr.responseText ? String(xhr.responseText).slice(0, 220) : "";
+            const retryAfter = xhr.getResponseHeader("retry-after") || "";
             console.warn("model-usage/claude", "OAuth usage probe unavailable (status " + xhr.status + ")" + (body ? " body=" + body : ""));
-            if (!root.hasAuthoritativeRateLimit)
-                root.clearUsageStatus();
+            if (!root.hasAuthoritativeRateLimit) {
+                root.usageStatusText = "Claude limits unavailable";
+                root.authHelpText = xhr.status === 429
+                    ? "Anthropic's usage endpoint is rate limiting checks right now" + (retryAfter ? " (retry after " + retryAfter + "s)" : "") + ". Local Claude Code stats are still shown."
+                    : "Anthropic's usage endpoint returned status " + xhr.status + ". Local Claude Code stats are still shown.";
+            }
             root.finishRefresh();
         };
         xhr.send();
@@ -359,11 +521,11 @@ Item {
         statsFile.reload();
         historyFile.reload();
         credentialsFile.reload();
+        if (!projectScanner.running)
+            projectScanner.running = true;
 
         if (root.oauthAccessToken && root.authMode === "oauth" && !root.oauthTokenExpired())
             root.probeRateLimits(force === true);
-        else
-            root.finishRefresh();
     }
 
     function formatResetTime(isoTimestamp) {

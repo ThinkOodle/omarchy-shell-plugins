@@ -102,9 +102,18 @@ Item {
       var line = provider.providerName + ": " + formatUsagePercent(provider) + " used"
       var pace = paceInfo(provider)
       if (pace.text !== "") line += " · " + pace.text
+      if (provider.syncEnabled && provider.syncDeviceCount > 1) line += " · " + provider.syncDeviceCount + " devices"
       lines.push(line)
     }
     return lines.join("\n")
+  }
+
+  function syncSummary(provider) {
+    if (usageMain.syncStatusText !== "") return usageMain.syncStatusText
+    if (!provider || !provider.syncEnabled) return ""
+    var count = Number(provider.syncDeviceCount || 0)
+    if (count <= 0) return "Synced usage"
+    return "Synced from " + count + " device" + (count === 1 ? "" : "s")
   }
 
   function selectTab(index) {
@@ -219,7 +228,7 @@ Item {
               if (wasOpen && wasSelected) root.popupOpen = false
               else {
                 root.popupOpen = true
-                usageMain.refreshAll()
+                root.triggerRefresh()
               }
             }
           }
@@ -335,7 +344,10 @@ Item {
 
             Text {
               Layout.fillWidth: true
-              text: "←/→ switch tabs · j/k scroll · r refresh · esc close"
+              text: {
+                var sync = root.syncSummary(root.selectedProvider)
+                return (sync !== "" ? sync + " · " : "") + "←/→ switch tabs · j/k scroll · r refresh · esc close"
+              }
               color: dim
               font.family: fontFamily
               font.pixelSize: 10
