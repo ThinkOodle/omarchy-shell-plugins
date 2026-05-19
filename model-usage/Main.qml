@@ -43,7 +43,7 @@ Item {
   property string barDisplayMode: setting("barDisplayMode", "active")
   property int barCycleIntervalSec: Math.max(1, Number(setting("barCycleIntervalSec", 5)))
   property string barMetric: setting("barMetric", "prompts")
-  property int refreshIntervalSec: Math.max(30, Number(setting("refreshIntervalSec", 300)))
+  property int refreshIntervalSec: Math.max(30, Number(setting("refreshIntervalSec", 900)))
 
   property var syncModeSetting: setting("syncMode", setting("syncEnabled", false))
   property bool syncEnabled: parseSyncEnabled(syncModeSetting)

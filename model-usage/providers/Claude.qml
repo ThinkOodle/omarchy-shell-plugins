@@ -108,7 +108,7 @@ Item {
     }
 
     Timer {
-        interval: 5 * 60 * 1000
+        interval: root.probeMinIntervalMs
         running: root.enabled && root.oauthAccessToken !== ""
         repeat: true
         onTriggered: root.probeRateLimits(false)
@@ -400,11 +400,25 @@ Item {
         return parseFloat(String(value).trim().replace("%", ""));
     }
 
-    function normalizeUtilization(value) {
+    function utilizationPayloadUsesPercentScale(values) {
+        for (let i = 0; i < values.length; i++) {
+            const n = parseNumber(values[i]);
+            if (n >= 1)
+                return true;
+        }
+        return false;
+    }
+
+    function normalizeUtilization(value, percentScale) {
         const n = parseNumber(value);
         if (!(n >= 0))
             return -1;
-        if (n > 1)
+
+        // Anthropic's OAuth usage endpoint currently reports percentages
+        // (for example 37.0 or 1.0). Older clients/examples sometimes used
+        // fractions (0.37). Treat a payload containing any value >= 1 as
+        // percent-scaled so 1.0 renders as 1%, not 100%.
+        if (percentScale === true || n > 1)
             return Math.min(1, n / 100);
         return Math.min(1, n);
     }
@@ -437,8 +451,9 @@ Item {
     }
 
     function applyAuthoritativeRateLimits(weekly, weeklyReset, session, sessionReset, sourceLabel) {
-        const weeklyNorm = root.normalizeUtilization(weekly);
-        const sessionNorm = root.normalizeUtilization(session);
+        const percentScale = root.utilizationPayloadUsesPercentScale([weekly, session]);
+        const weeklyNorm = root.normalizeUtilization(weekly, percentScale);
+        const sessionNorm = root.normalizeUtilization(session, percentScale);
         if (weeklyNorm < 0 && sessionNorm < 0)
             return false;
 
