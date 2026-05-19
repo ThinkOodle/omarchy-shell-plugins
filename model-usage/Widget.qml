@@ -276,7 +276,7 @@ Item {
             Repeater {
               model: providers
 
-              PillButton {
+              Button {
                 required property var modelData
                 required property int index
                 width: (parent.width - parent.spacing * Math.max(0, providers.length - 1)) / Math.max(1, providers.length)
@@ -373,7 +373,7 @@ Item {
       Layout.alignment: Qt.AlignVCenter
     }
 
-    PillButton {
+    Button {
       visible: provider && String(provider.tierLabel || "") !== ""
       text: provider ? provider.tierLabel : ""
       foreground: root.foreground
@@ -387,7 +387,7 @@ Item {
       enabled: false
     }
 
-    PillButton {
+    Button {
       text: (root.refreshFlash || usageMain.refreshing) ? "Refreshing…" : "Refresh"
       foreground: root.foreground
       tooltipText: (root.refreshFlash || usageMain.refreshing) ? "Refreshing usage…" : "Refresh usage"
