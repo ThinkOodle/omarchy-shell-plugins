@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "id": "next-meeting",
+  "name": "NextMeeting",
+  "version": "0.1.0",
+  "author": "tylerbarnett3",
+  "license": "MIT",
+  "description": "Shows your next Google Meet event in the Omarchy bar and opens it on click.",
+  "kinds": ["bar-widget"],
+  "activation": "on-demand",
+  "entryPoints": {
+    "barWidget": "Widget.qml"
+  },
+  "barWidget": {
+    "displayName": "NextMeeting",
+    "description": "Shows your next calendar event and opens Google Meet links.",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaults": {
+      "refreshIntervalSec": 1800,
+      "scheduleClearText": "No more meetings today ✅",
+      "lookaheadDays": 7,
+      "maxDisplayChars": 42,
+      "meetOpenMode": "chrome-app",
+      "meetOpenCommand": ""
+    },
+    "schema": [
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Auto-fetch interval (seconds)",
+        "description": "How often NextMeeting checks gcalcli for calendar changes. Right-click the widget to refresh manually.",
+        "defaultValue": 1800,
+        "min": 60,
+        "max": 86400,
+        "step": 60
+      },
+      {
+        "key": "scheduleClearText",
+        "type": "string",
+        "label": "Schedule clear text",
+        "description": "Text shown when there are no more meetings today.",
+        "defaultValue": "No more meetings today ✅"
+      },
+      {
+        "key": "lookaheadDays",
+        "type": "integer",
+        "label": "Lookahead window (days)",
+        "description": "How many days ahead NextMeeting should look for the next event.",
+        "defaultValue": 7,
+        "min": 1,
+        "max": 30,
+        "step": 1
+      },
+      {
+        "key": "maxDisplayChars",
+        "type": "integer",
+        "label": "Maximum display characters",
+        "description": "Maximum length of meeting text before it is truncated with ellipsis.",
+        "defaultValue": 42,
+        "min": 12,
+        "max": 120,
+        "step": 1
+      },
+      {
+        "key": "meetOpenMode",
+        "type": "enum",
+        "label": "Meet open mode",
+        "description": "How NextMeeting opens Google Meet links. Chrome app mode is the default for better Google Meet background effects on many Linux systems.",
+        "options": ["chrome-app", "system-browser", "custom-command"],
+        "defaultValue": "chrome-app"
+      },
+      {
+        "key": "meetOpenCommand",
+        "type": "string",
+        "label": "Custom open command",
+        "description": "Used only when Meet open mode is custom-command. The Meet URL is available as $NEXT_MEETING_URL.",
+        "defaultValue": ""
+      }
+    ]
+  }
+}

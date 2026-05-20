@@ -18,6 +18,24 @@ Features:
 - Optional synced aggregation across multiple machines
 - Keyboard controls: `←`/`→` or `h`/`l` to switch tabs, `j`/`k` to scroll, `r` to refresh, `Esc` to close
 
+### `next-meeting`
+
+Shows your next calendar event in the Omarchy bar and opens the Google Meet link on click.
+
+Features:
+
+- Uses `gcalcli` agenda data for upcoming events
+- Only includes calendar events that have a Google Meet link
+- Shows the next event for today, then falls back to a schedule-clear message
+- Opens Google Meet in a Chrome app window by default and nudges it into Hyprland tiling if possible
+- Can use the system browser or a custom command instead
+
+Dependencies:
+
+- `gcalcli`
+- `google-chrome-stable` is recommended for the default Chrome app launch mode because Google Meet background effects are more reliable there on many Linux setups
+- Optional: `jq` and `hyprctl` for nudging the opened Meet window into Hyprland tiling
+
 ## Install locally
 
 ```bash
@@ -31,6 +49,21 @@ If the plugin already exists, remove it first:
 
 ```bash
 rm -rf ~/.config/omarchy/plugins/model-usage
+```
+
+Install `next-meeting` locally:
+
+```bash
+mkdir -p ~/.config/omarchy/plugins
+ln -s ~/Work/omarchy-shell-plugins/next-meeting ~/.config/omarchy/plugins/next-meeting
+omarchy shell shell setPluginEnabled next-meeting true
+omarchy restart shell
+```
+
+If the plugin already exists, remove it first:
+
+```bash
+rm -rf ~/.config/omarchy/plugins/next-meeting
 ```
 
 ## Optional synced aggregation
