@@ -31,7 +31,7 @@ Item {
   readonly property var providers: usageMain.enabledProviders
   readonly property var selectedProvider: providers.length > 0 ? providers[Math.min(selectedTabIndex, providers.length - 1)] : null
 
-  function closePopout() { popupOpen = false }
+  function close() { popupOpen = false }
 
   function triggerRefresh() {
     refreshFlash = true
@@ -257,7 +257,7 @@ Item {
         if (dx !== 0) root.selectTab(root.selectedTabIndex + dx)
         if (dy !== 0) flick.contentY = root.clamp(flick.contentY + dy * 56, 0, Math.max(0, flick.contentHeight - flick.height))
       }
-      onCloseRequested: root.closePopout()
+      onCloseRequested: root.close()
       onTextKey: function(t) {
         if (t === "r" || t === "R") root.triggerRefresh()
       }
