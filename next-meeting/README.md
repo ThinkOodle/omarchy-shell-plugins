@@ -1,6 +1,6 @@
 # NextMeeting
 
-NextMeeting is an Omarchy shell bar widget that shows your next Google Calendar event and opens its Google Meet link on click.
+NextMeeting is an Omarchy shell bar widget that shows your next Google Calendar event and opens Google Meet on click.
 
 It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read your calendar from the command line.
 
@@ -8,8 +8,9 @@ It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read your calendar fr
 
 - Shows the next non-declined calendar event for today that has a Google Meet link.
 - Ignores calendar events without a `https://meet.google.com/...` link.
+- Detects time conflicts and shows `⚠️ N meetings at <time>` when multiple Google Meet events share the same start time.
 - Shows configurable schedule-clear text when there are no more meetings today.
-- Left-click opens the next Google Meet link, when one is available.
+- Left-click opens the next Google Meet link, or opens `https://meet.google.com/landing` when there is a same-time conflict.
 - Right-click refreshes the calendar immediately.
 - Auto-refresh interval is configurable.
 
@@ -73,6 +74,7 @@ If that command cannot read your calendar, NextMeeting will stay hidden.
 ## Usage
 
 - Left-click: open the next event's Google Meet link.
+  - If multiple Google Meet events are at the same time, open the Google Meet landing page so you can pick the right meeting.
 - Right-click: refresh calendar data immediately.
 
 By default, NextMeeting auto-refreshes every 30 minutes. Right-click is useful when you just added or changed a meeting and do not want to wait for the next automatic refresh.
@@ -128,6 +130,8 @@ Settings:
 | `meetOpenMode` | `chrome-app` | How to open Meet links: `chrome-app`, `system-browser`, or `custom-command`. |
 | `meetOpenCommand` | empty | Command used only when `meetOpenMode` is `custom-command`. The Meet URL is available as `$NEXT_MEETING_URL`. |
 
+When there is a same-time conflict, `$NEXT_MEETING_URL` is set to `https://meet.google.com/landing`.
+
 ## Meeting Launch Modes
 
 By default, NextMeeting opens meetings with google-chrome-stable in Chrome app mode. Google Meet background effects (and sometimes device handling) are generally more reliable in Google Chrome Stable on Linux.
@@ -154,6 +158,8 @@ gcalcli agenda <start> <end> --nodeclined --tsv --details title --details confer
 
 The widget scans for events within the configured lookahead window, but it only displays events that include a Google Meet link. A meeting will remain in the widget for 5 minutes past its start time, after which the next Google Meet event on your calendar will take its place.
 
+If two or more Google Meet events share the same start time, the widget shows `⚠️ N meetings at <time>`. The tooltip adds a plain-text bulleted list of all meeting titles at that conflict time.
+
 If the next event is not today, NextMeeting shows the no-more-meetings text instead.
 
 ## Files
@@ -162,7 +168,7 @@ If the next event is not today, NextMeeting shows the no-more-meetings text inst
 - `Widget.qml`: visible bar widget and click handling.
 - `Main.qml`: refresh timer, settings, and process wiring.
 - `scripts/next-event.sh`: fetches and formats the next calendar event.
-- `scripts/next-event-open.sh`: opens the next event's Google Meet link using the configured launch mode. If `jq` and `hyprctl` are available in `chrome-app` mode, it also tries to nudge the Chrome app window into Hyprland tiling.
+- `scripts/next-event-open.sh`: opens the next event's Google Meet link using the configured launch mode, or the Meet landing page for same-time conflicts. If `jq` and `hyprctl` are available in `chrome-app` mode, it also tries to nudge the Chrome app window into Hyprland tiling.
 - `scripts/configure.sh`: optional TUI for editing widget settings.
 
 ## Troubleshooting

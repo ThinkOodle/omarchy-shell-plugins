@@ -28,7 +28,9 @@ Item {
       id: label
       anchors.centerIn: parent
       text: main.text
-      color: main.stateClass === "off" ? Qt.darker(bar ? bar.foreground : Color.foreground, 1.35) : (bar ? bar.foreground : Color.foreground)
+      color: main.stateClass === "off"
+        ? Qt.darker(bar ? bar.foreground : Color.foreground, 1.35)
+        : (main.stateClass === "conflict" ? (bar ? bar.urgent : Color.urgent) : (bar ? bar.foreground : Color.foreground))
       font.family: bar ? bar.fontFamily : "JetBrainsMono Nerd Font"
       font.pixelSize: 14
       elide: Text.ElideRight
