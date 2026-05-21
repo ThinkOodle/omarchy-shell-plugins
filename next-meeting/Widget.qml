@@ -30,7 +30,7 @@ Item {
       text: main.text
       color: main.stateClass === "off" ? Qt.darker(bar ? bar.foreground : Color.foreground, 1.35) : (bar ? bar.foreground : Color.foreground)
       font.family: bar ? bar.fontFamily : "JetBrainsMono Nerd Font"
-      font.pixelSize: 14
+      font.pixelSize: 12
       elide: Text.ElideRight
       width: Math.min(420, implicitWidth)
       visible: text !== ""
