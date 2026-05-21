@@ -5,6 +5,7 @@ set -u
 lookahead_days=${1-7}
 meet_open_mode=${2-chrome-app}
 meet_open_command=${3-}
+landing_url="https://meet.google.com/landing"
 
 case "$lookahead_days" in
   ''|*[!0-9]*) lookahead_days=7 ;;
@@ -26,7 +27,7 @@ if [ -z "$agenda" ]; then
   exit 0
 fi
 
-url=$(printf '%s\n' "$agenda" | awk -F '\t' -v cutoff="$start_time" '
+event_pick=$(printf '%s\n' "$agenda" | awk -F '\t' -v cutoff="$start_time" '
   NR == 1 { next }
   {
     event_date = $1
@@ -36,15 +37,41 @@ url=$(printf '%s\n' "$agenda" | awk -F '\t' -v cutoff="$start_time" '
 
     if (start == "") next
     if ((event_date " " start) < cutoff) next
-    if (conference_uri ~ /^https:\/\/meet\.google\.com\//) print conference_uri
-    else if (hangout_link ~ /^https:\/\/meet\.google\.com\//) print hangout_link
+    if (conference_uri ~ /^https:\/\/meet\.google\.com\//) url = conference_uri
+    else if (hangout_link ~ /^https:\/\/meet\.google\.com\//) url = hangout_link
     else next
-    exit
+
+    slot = event_date "\t" start
+    if (!(slot in seen)) {
+      seen[slot] = 1
+      order[++count] = slot
+    }
+
+    event_count[slot]++
+    if (!(slot in first_url)) first_url[slot] = url
+  }
+  END {
+    for (i = 1; i <= count; i++) {
+      slot = order[i]
+      print event_count[slot] "\t" first_url[slot]
+      exit
+    }
   }
 ')
 
-if [ -z "$url" ]; then
+if [ -z "$event_pick" ]; then
   exit 0
+fi
+
+event_count=${event_pick%%$'\t'*}
+url=${event_pick#*$'\t'}
+
+case "$event_count" in
+  ''|*[!0-9]*) event_count=1 ;;
+esac
+
+if [ "$event_count" -ge 2 ]; then
+  url="$landing_url"
 fi
 
 case "$meet_open_mode" in
@@ -92,8 +119,8 @@ fi
     client=$(hyprctl clients -j 2>/dev/null | jq -r '
       map(select(
         (.class // "" | contains("meet.google.com"))
-        or (.initialTitle // "" | startswith("meet.google.com"))
-        or ((.title // "" | test("Google Meet|Meet$")) and (.class // "" | test("chrome|chromium"; "i")))
+        or (.initialTitle // "" | contains("meet.google.com"))
+        or ((.title // "" | test("Google Meet|Meet$|meet\\.google\\.com|Your meetings"; "i")) and (.class // "" | test("chrome|chromium"; "i")))
       ))
       | sort_by(.focusHistoryID)
       | .[0]
