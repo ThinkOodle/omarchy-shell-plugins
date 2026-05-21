@@ -17,6 +17,10 @@ emit_off() {
 schedule_clear_text=${1-"No more meetings today ✅"}
 lookahead_days=${2-7}
 max_display_chars=${3-42}
+shift 3 || true
+# Remaining args are calendar names, one per arg, passed through verbatim
+# to gcalcli as `--calendar <name>` so names containing commas survive.
+calendars=("$@")
 
 case "$lookahead_days" in
   ''|*[!0-9]*) lookahead_days=7 ;;
@@ -45,25 +49,49 @@ fi
 start_time=$(date -d '-5 minutes' '+%Y-%m-%d %H:%M')
 end_time=$(date -d "+${lookahead_days} days" '+%Y-%m-%d %H:%M')
 
-agenda=$(gcalcli agenda "$start_time" "$end_time" --nodeclined --tsv --details title --details conference --details url 2>/dev/null || true)
+calendar_args=()
+for cal in "${calendars[@]}"; do
+  [ -n "$cal" ] && calendar_args+=(--calendar "$cal")
+done
+
+agenda=$(gcalcli "${calendar_args[@]}" agenda "$start_time" "$end_time" --nodeclined --tsv --details title --details conference --details url 2>/dev/null || true)
 
 if [ -z "$agenda" ]; then
   emit_schedule_clear
   exit 0
 fi
 
+# Read columns by header name so this survives gcalcli adding or reordering
+# fields. The output line has the next Meet event as TAB-separated:
+#   <event_date>\t<start_time>\t<title>\t<meet_url>
 next_event=$(printf '%s\n' "$agenda" | awk -F '\t' -v cutoff="$start_time" '
-  NR == 1 { next }
+  NR == 1 {
+    for (i = 1; i <= NF; i++) {
+      if ($i == "start_date") date_col = i
+      else if ($i == "start_time") start_col = i
+      else if ($i == "hangout_link") hangout_col = i
+      else if ($i == "conference_uri") conf_col = i
+      else if ($i == "title") title_col = i
+    }
+    if (!date_col || !start_col || !title_col) exit 1
+    next
+  }
   {
-    event_date = $1
-    start = $2
-    hangout_link = $6
-    conference_uri = $8
-    title = $9
+    event_date = $date_col
+    start = $start_col
+    title = $title_col
+    hangout_link = hangout_col ? $hangout_col : ""
+    conference_uri = conf_col ? $conf_col : ""
+
     if (start == "") next
     if ((event_date " " start) < cutoff) next
-    if (conference_uri !~ /^https:\/\/meet\.google\.com\// && hangout_link !~ /^https:\/\/meet\.google\.com\//) next
-    print event_date "\t" start "\t" title
+
+    url = ""
+    if (conference_uri ~ /^https:\/\/meet\.google\.com\//) url = conference_uri
+    else if (hangout_link ~ /^https:\/\/meet\.google\.com\//) url = hangout_link
+    else next
+
+    print event_date "\t" start "\t" title "\t" url
     exit
   }
 ')
@@ -75,10 +103,7 @@ if [ -z "$next_event" ]; then
   exit 0
 fi
 
-event_date=${next_event%%$'\t'*}
-rest=${next_event#*$'\t'}
-event_time=${rest%%$'\t'*}
-event_title=${next_event##*$'\t'}
+IFS=$'\t' read -r event_date event_time event_title event_url <<<"$next_event"
 
 if [ "$event_date" != "$today" ]; then
   emit_schedule_clear
@@ -121,5 +146,6 @@ fi
 
 escaped_text=$(json_escape "${display}")
 escaped_tooltip=$(json_escape "${tooltip}")
+escaped_url=$(json_escape "${event_url}")
 
-printf '{"text":"%s","tooltip":"%s","hasMeeting":true}\n' "$escaped_text" "$escaped_tooltip"
+printf '{"text":"%s","tooltip":"%s","url":"%s","hasMeeting":true}\n' "$escaped_text" "$escaped_tooltip" "$escaped_url"

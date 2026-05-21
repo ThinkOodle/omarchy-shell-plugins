@@ -36,6 +36,8 @@ Dependencies:
 - `google-chrome-stable` is recommended for the default Chrome app launch mode because Google Meet background effects are more reliable there on many Linux setups
 - Optional: `jq` and `hyprctl` for nudging the opened Meet window into Hyprland tiling
 
+Settings live in `~/.config/omarchy/shell.json` and can be edited via `omarchy launch bar settings`. Exposes `refresh` and `open` over Omarchy shell IPC on the `next-meeting` target.
+
 ## Install locally
 
 ```bash

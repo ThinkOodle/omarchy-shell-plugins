@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "next-meeting",
   "name": "NextMeeting",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "tylerbarnett3",
   "license": "MIT",
   "description": "Shows your next Google Meet event in the Omarchy bar and opens it on click.",
@@ -22,7 +22,9 @@
       "lookaheadDays": 7,
       "maxDisplayChars": 42,
       "meetOpenMode": "chrome-app",
-      "meetOpenCommand": ""
+      "meetOpenCommand": "",
+      "chromeAppFlags": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing",
+      "calendars": []
     },
     "schema": [
       {
@@ -76,6 +78,24 @@
         "label": "Custom open command",
         "description": "Used only when Meet open mode is custom-command. The Meet URL is available as $NEXT_MEETING_URL.",
         "defaultValue": ""
+      },
+      {
+        "key": "chromeAppFlags",
+        "type": "string",
+        "label": "Chrome app flags",
+        "description": "Space-separated flags passed to google-chrome-stable in chrome-app mode. Defaults work around common Wayland/GPU quirks on Hyprland; clear this if Chrome runs well natively for you.",
+        "defaultValue": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing"
+      },
+      {
+        "key": "calendars",
+        "type": "multiselect",
+        "label": "Calendars",
+        "description": "Calendars to consider when looking for the next meeting. Leave empty to use every calendar on the account.",
+        "placeholderText": "Search calendars...",
+        "emptyText": "No calendars found. Run 'gcalcli list' in a terminal.",
+        "noSelectionText": "All calendars",
+        "optionsCommand": ["scripts/list-calendars.sh"],
+        "defaultValue": []
       }
     ]
   }

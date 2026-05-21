@@ -2,46 +2,10 @@
 
 set -u
 
-lookahead_days=${1-7}
+url=${1-}
 meet_open_mode=${2-chrome-app}
 meet_open_command=${3-}
-
-case "$lookahead_days" in
-  ''|*[!0-9]*) lookahead_days=7 ;;
-esac
-
-if [ "$lookahead_days" -lt 1 ]; then lookahead_days=1; fi
-if [ "$lookahead_days" -gt 30 ]; then lookahead_days=30; fi
-
-if ! command -v gcalcli >/dev/null 2>&1; then
-  exit 0
-fi
-
-start_time=$(date -d '-5 minutes' '+%Y-%m-%d %H:%M')
-end_time=$(date -d "+${lookahead_days} days" '+%Y-%m-%d %H:%M')
-
-agenda=$(gcalcli agenda "$start_time" "$end_time" --nodeclined --tsv --details title --details conference --details url 2>/dev/null || true)
-
-if [ -z "$agenda" ]; then
-  exit 0
-fi
-
-url=$(printf '%s\n' "$agenda" | awk -F '\t' -v cutoff="$start_time" '
-  NR == 1 { next }
-  {
-    event_date = $1
-    start = $2
-    hangout_link = $6
-    conference_uri = $8
-
-    if (start == "") next
-    if ((event_date " " start) < cutoff) next
-    if (conference_uri ~ /^https:\/\/meet\.google\.com\//) print conference_uri
-    else if (hangout_link ~ /^https:\/\/meet\.google\.com\//) print hangout_link
-    else next
-    exit
-  }
-')
+chrome_app_flags=${4-}
 
 if [ -z "$url" ]; then
   exit 0
@@ -79,7 +43,9 @@ if [ -z "$chrome_cmd" ]; then
   exit 0
 fi
 
-"$chrome_cmd" --new-window --ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing --app="$url" >/dev/null 2>&1 &
+# shellcheck disable=SC2206
+extra_flags=( $chrome_app_flags )
+"$chrome_cmd" --new-window "${extra_flags[@]}" --app="$url" >/dev/null 2>&1 &
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v hyprctl >/dev/null 2>&1; then
   exit 0
