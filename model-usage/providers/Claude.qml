@@ -47,6 +47,7 @@ Item {
 
     property double lastProbeAtMs: 0
     property int probeMinIntervalMs: 15 * 60 * 1000
+    property bool projectScanRerunForce: false
 
     property var providerSettings: ({})
 
@@ -55,6 +56,15 @@ Item {
             return (Quickshell.env("HOME") ?? "/home") + p.substring(1);
         return p;
     }
+
+    function pathFromUrl(url) {
+        const value = String(url || "");
+        if (value.indexOf("file://") === 0)
+            return decodeURIComponent(value.substring(7));
+        return value;
+    }
+
+    readonly property string projectScannerScriptPath: pathFromUrl(Qt.resolvedUrl("../scripts/claude_usage_scanner.py"))
 
     FileView {
         id: statsFile
@@ -92,11 +102,11 @@ Item {
     Process {
         id: projectScanner
         running: false
-        command: ["bash", "-c", "dir=$0; command -v rg >/dev/null || exit 0; [[ -d \"$dir\" ]] || exit 0; rg --json -e '\"usage\":' \"$dir\" || true", root.resolvePath(root.providerSettings?.projectsPath ?? "~/.claude/projects")]
+        command: []
 
         stdout: StdioCollector {
             waitForEnd: true
-            onStreamFinished: root.parseProjectUsage(text)
+            onStreamFinished: root.applyProjectUsageSummary(text)
         }
 
         stderr: StdioCollector {
@@ -104,7 +114,13 @@ Item {
             onStreamFinished: if (text.trim() !== "") console.warn("model-usage/claude", text.trim())
         }
 
-        onExited: root.finishRefresh()
+        onExited: {
+            root.finishRefresh();
+            if (root.projectScanRerunForce) {
+                root.projectScanRerunForce = false;
+                root.startProjectScanner(true);
+            }
+        }
     }
 
     Timer {
@@ -148,141 +164,26 @@ Item {
         }
     }
 
-    function usageToken(usage, snakeKey, camelKey) {
-        if (!usage)
-            return 0;
-        const value = usage[snakeKey] ?? usage[camelKey] ?? 0;
-        const n = Number(value || 0);
-        return isFinite(n) ? Math.round(n) : 0;
-    }
-
-    function localDateFromTimestamp(value) {
-        if (value === undefined || value === null)
-            return localDateString();
-        if (typeof value === "number") {
-            const ms = value > 10000000000 ? value : value * 1000;
-            const d = new Date(ms);
-            if (!isNaN(d.getTime()))
-                return dateString(d);
-        }
-        const parsed = new Date(String(value));
-        if (!isNaN(parsed.getTime()))
-            return dateString(parsed);
-        return localDateString();
-    }
-
-    function dateString(date) {
-        const y = date.getFullYear();
-        const m = String(date.getMonth() + 1).padStart(2, "0");
-        const d = String(date.getDate()).padStart(2, "0");
-        return y + "-" + m + "-" + d;
-    }
-
-    function recentDateStrings() {
-        const out = [];
-        for (let offset = 6; offset >= 0; offset--) {
-            const d = new Date();
-            d.setDate(d.getDate() - offset);
-            out.push(dateString(d));
-        }
-        return out;
-    }
-
-    function parseProjectUsage(rgOutput) {
+    function applyProjectUsageSummary(content) {
         try {
-            const today = localDateString();
-            const recentDates = recentDateStrings();
-            const recent = {};
-            for (let i = 0; i < recentDates.length; i++)
-                recent[recentDates[i]] = { date: recentDates[i], messageCount: 0 };
-
-            const seen = {};
-            const sessions = {};
-            const todaySessionsMap = {};
-            const todayTokens = {};
-            const usageByModel = {};
-            let prompts = 0;
-            let todayPromptCount = 0;
-            let todayTokenTotal = 0;
-
-            const lines = String(rgOutput || "").split("\n");
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line)
-                    continue;
-
-                let event;
-                try { event = JSON.parse(line); } catch (e) { continue; }
-                if (event.type !== "match")
-                    continue;
-
-                const text = event.data?.lines?.text ?? "";
-                const path = event.data?.path?.text ?? "claude-project";
-                let entry;
-                try { entry = JSON.parse(text); } catch (e) { continue; }
-
-                const message = entry.message && typeof entry.message === "object" ? entry.message : {};
-                if (entry.type !== "assistant" && message.role !== "assistant")
-                    continue;
-
-                const usage = message.usage || entry.usage;
-                if (!usage)
-                    continue;
-
-                const messageId = message.id || entry.messageId || "";
-                const uniqueKey = messageId ? String(messageId) : (path + ":" + String(entry.uuid || entry.requestId || i));
-                if (seen[uniqueKey])
-                    continue;
-                seen[uniqueKey] = true;
-
-                const inputTokens = usageToken(usage, "input_tokens", "inputTokens");
-                const outputTokens = usageToken(usage, "output_tokens", "outputTokens");
-                const cacheRead = usageToken(usage, "cache_read_input_tokens", "cacheReadInputTokens");
-                const cacheWrite = usageToken(usage, "cache_creation_input_tokens", "cacheCreationInputTokens");
-                const total = inputTokens + outputTokens + cacheRead + cacheWrite;
-                if (total <= 0)
-                    continue;
-
-                const model = String(message.model || entry.model || "claude");
-                const day = localDateFromTimestamp(entry.timestamp || message.timestamp);
-                const sessionKey = String(entry.sessionId || path);
-                sessions[sessionKey] = true;
-                prompts++;
-
-                const bucket = usageByModel[model] || { inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 };
-                bucket.inputTokens += inputTokens;
-                bucket.outputTokens += outputTokens;
-                bucket.cacheReadInputTokens += cacheRead;
-                bucket.cacheCreationInputTokens += cacheWrite;
-                usageByModel[model] = bucket;
-
-                if (recent[day])
-                    recent[day].messageCount += total;
-
-                if (day === today) {
-                    todayPromptCount++;
-                    todaySessionsMap[sessionKey] = true;
-                    todayTokenTotal += total;
-                    todayTokens[model] = (todayTokens[model] || 0) + total;
-                }
-            }
-
-            if (prompts === 0)
+            const data = JSON.parse(String(content || "{}"));
+            const prompts = Math.max(0, Number(data.totalPrompts || 0));
+            if (prompts <= 0)
                 return;
 
             root.hasProjectStats = true;
-            root.todayPrompts = todayPromptCount;
-            root.todaySessions = Object.keys(todaySessionsMap).length;
-            root.todayTotalTokens = todayTokenTotal;
-            root.todayTokensByModel = todayTokens;
-            root.recentDays = recentDates.map(d => recent[d]);
-            root.modelUsage = usageByModel;
+            root.todayPrompts = Math.max(0, Number(data.todayPrompts || 0));
+            root.todaySessions = Math.max(0, Number(data.todaySessions || 0));
+            root.todayTotalTokens = Math.max(0, Number(data.todayTotalTokens || 0));
+            root.todayTokensByModel = data.todayTokensByModel || ({});
+            root.recentDays = data.recentDays || [];
+            root.modelUsage = data.modelUsage || ({});
             root.totalPrompts = prompts;
-            root.totalSessions = Object.keys(sessions).length;
-            root.dailyActivity = root.recentDays;
+            root.totalSessions = Math.max(0, Number(data.totalSessions || 0));
+            root.dailyActivity = data.dailyActivity || root.recentDays;
             root.ready = true;
         } catch (e) {
-            console.error("model-usage/claude", "Failed to parse project usage:", e);
+            console.error("model-usage/claude", "Failed to parse project usage summary:", e);
         }
     }
 
@@ -531,13 +432,27 @@ Item {
         xhr.send();
     }
 
+    function startProjectScanner(force) {
+        if (projectScanner.running) {
+            if (force === true)
+                root.projectScanRerunForce = true;
+            return false;
+        }
+
+        const command = ["python3", root.projectScannerScriptPath, root.resolvePath(root.providerSettings?.projectsPath ?? "~/.claude/projects")];
+        if (force === true)
+            command.push("--force");
+        projectScanner.command = command;
+        projectScanner.running = true;
+        return true;
+    }
+
     function refresh(force) {
         root.refreshing = true;
         statsFile.reload();
         historyFile.reload();
         credentialsFile.reload();
-        if (!projectScanner.running)
-            projectScanner.running = true;
+        root.startProjectScanner(force === true);
 
         if (root.oauthAccessToken && root.authMode === "oauth" && !root.oauthTokenExpired())
             root.probeRateLimits(force === true);
