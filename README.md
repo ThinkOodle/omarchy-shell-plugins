@@ -18,6 +18,23 @@ Features:
 - Optional synced aggregation across multiple machines
 - Keyboard controls: `←`/`→` or `h`/`l` to switch tabs, `j`/`k` to scroll, `r` to refresh, `Esc` to close
 
+### `tailscale`
+
+Tailscale controls and peer browser in the Omarchy bar.
+
+Features:
+
+- Toggle Tailscale on/off
+- Switch between logged-in Tailscale accounts
+- Browse peers reported by `tailscale status --json`
+- Copy peer IPs, host names, and DNS names
+- Keyboard controls: `j`/`k` move, `Enter` activates, `c` copies IP, `n` copies name, `d` copies DNS, `t` toggles, `r` refreshes, `Esc` closes
+
+Dependencies:
+
+- `tailscale`
+- `wl-copy` for copy actions
+
 ### `next-meeting`
 
 Shows your next calendar event in the Omarchy bar and opens the Google Meet link on click.
@@ -53,6 +70,17 @@ If the plugin already exists, remove it first:
 rm -rf ~/.config/omarchy/plugins/model-usage
 ```
 
+Install `tailscale` locally:
+
+```bash
+mkdir -p ~/.config/omarchy/plugins
+ln -s ~/Work/omarchy-shell-plugins/tailscale ~/.config/omarchy/plugins/tailscale
+omarchy-shell shell rescanPlugins
+omarchy-shell shell setPluginEnabled tailscale true
+```
+
+Then add `{ "id": "tailscale" }` to one of the `bar.layout` sections in `~/.config/omarchy/shell.json` (or use Omarchy's bar settings UI), and restart the shell.
+
 Install `next-meeting` locally:
 
 ```bash
@@ -62,10 +90,10 @@ omarchy shell shell setPluginEnabled next-meeting true
 omarchy restart shell
 ```
 
-If the plugin already exists, remove it first:
+If a plugin already exists, remove it first:
 
 ```bash
-rm -rf ~/.config/omarchy/plugins/next-meeting
+rm -rf ~/.config/omarchy/plugins/<plugin-id>
 ```
 
 ## Optional synced aggregation

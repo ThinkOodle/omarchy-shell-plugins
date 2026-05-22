@@ -6,15 +6,12 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
-Item {
+BarWidget {
   id: root
+  moduleName: "model-usage"
 
-  property QtObject bar: null
-  property string moduleName: "model-usage"
-  property var settings: ({})
   property bool popupOpen: false
   property int selectedTabIndex: 0
-  property Item activeAnchorItem: null
   property bool refreshFlash: false
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
@@ -124,6 +121,23 @@ Item {
     selectedTabIndex = ((index % providers.length) + providers.length) % providers.length
   }
 
+  function handleChipPress(index, button, target) {
+    if (root.bar && target) root.bar.hideTooltip(target)
+    if (button === Qt.RightButton) {
+      root.triggerRefresh()
+      return
+    }
+
+    var wasOpen = root.popupOpen
+    var wasSelected = root.selectedTabIndex === index
+    root.selectTab(index)
+    if (wasOpen && wasSelected) root.popupOpen = false
+    else {
+      root.popupOpen = true
+      root.triggerRefresh()
+    }
+  }
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
@@ -131,8 +145,6 @@ Item {
     if (popupOpen) {
       usageMain.refreshAll()
       Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() })
-    } else {
-      activeAnchorItem = null
     }
   }
 
@@ -177,6 +189,7 @@ Item {
           required property var modelData
           required property int index
           readonly property real pct: root.usagePercent(modelData)
+          readonly property bool tooltipHovered: mouseArea.containsMouse
 
           width: chipRow.implicitWidth
           height: root.bar ? root.bar.barSize : 26
@@ -208,29 +221,35 @@ Item {
             }
           }
 
+          property var registeredBar: null
+
+          function triggerPress(button) {
+            root.handleChipPress(chip.index, button, chip)
+          }
+
+          function syncClickRegistration() {
+            if (registeredBar && registeredBar.unregisterClickTarget) registeredBar.unregisterClickTarget(chip)
+            registeredBar = root.bar
+            if (registeredBar && registeredBar.registerClickTarget) registeredBar.registerClickTarget(chip)
+          }
+
+          Component.onCompleted: syncClickRegistration()
+          Component.onDestruction: if (registeredBar && registeredBar.unregisterClickTarget) registeredBar.unregisterClickTarget(chip)
+
+          Connections {
+            target: root
+            function onBarChanged() { chip.syncClickRegistration() }
+          }
+
           MouseArea {
+            id: mouseArea
             anchors.fill: parent
             acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onEntered: if (root.bar) root.bar.showTooltip(chip, root.tooltipText())
             onExited: if (root.bar) root.bar.hideTooltip(chip)
-            onClicked: function(mouse) {
-              if (root.bar) root.bar.hideTooltip(chip)
-              if (mouse.button === Qt.RightButton) {
-                root.triggerRefresh()
-                return
-              }
-              var wasOpen = root.popupOpen
-              var wasSelected = root.selectedTabIndex === chip.index
-              root.selectTab(chip.index)
-              root.activeAnchorItem = chip
-              if (wasOpen && wasSelected) root.popupOpen = false
-              else {
-                root.popupOpen = true
-                root.triggerRefresh()
-              }
-            }
+            onClicked: function(mouse) { root.handleChipPress(chip.index, mouse.button, chip) }
           }
         }
       }
@@ -239,15 +258,13 @@ Item {
 
   KeyboardPanel {
     id: panel
-    anchorItem: root.activeAnchorItem || button
+    anchorItem: button
     owner: root
     bar: root.bar
     open: root.popupOpen
-    contentWidth: 370
-    contentHeight: 560
-    padding: 12
-    margin: 10
-    gap: 10
+    focusTarget: keyCatcher
+    contentWidth: panel.fittedContentWidth(Style.space(370))
+    contentHeight: panel.fittedContentHeight(contentColumn.implicitHeight, Style.space(560))
 
     PanelKeyCatcher {
       id: keyCatcher
