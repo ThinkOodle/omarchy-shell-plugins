@@ -35,6 +35,23 @@ Dependencies:
 - `tailscale`
 - `wl-copy` for copy actions
 
+### `orbit`
+
+Cursor-centered radial launcher designed for mouse-button hold/release workflows.
+
+Features:
+
+- Opens an overlay ring at the current cursor position
+- Hover-by-direction slice selection with release-to-activate behavior
+- Configurable rings/actions via `~/.config/omarchy/orbit.json`
+- Supports nested rings, shell commands, direct argv commands, and close-only slices
+- Includes helper scripts to open at cursor, activate on release, and sniff mouse button codes
+
+Dependencies:
+
+- `wev` for button sniffing
+- Python `evdev` module for physical-button release detection
+
 ### `next-meeting`
 
 Shows your next calendar event in the Omarchy bar and opens the Google Meet link on click.
@@ -80,6 +97,24 @@ omarchy-shell shell setPluginEnabled tailscale true
 ```
 
 Then add `{ "id": "tailscale" }` to one of the `bar.layout` sections in `~/.config/omarchy/shell.json` (or use Omarchy's bar settings UI), and restart the shell.
+
+Install `orbit` locally:
+
+```bash
+mkdir -p ~/.config/omarchy/plugins
+ln -s ~/Work/omarchy-shell-plugins/orbit ~/.config/omarchy/plugins/orbit
+omarchy plugin rescan
+omarchy plugin enable orbit
+omarchy restart shell
+```
+
+Then sniff your mouse button and bind it:
+
+```bash
+~/.config/omarchy/plugins/orbit/scripts/sniff-button.sh
+```
+
+See `orbit/README.md` for the Hyprland binding and ring configuration.
 
 Install `next-meeting` locally:
 
