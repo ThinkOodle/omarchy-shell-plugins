@@ -66,7 +66,13 @@ If your sniffed token is not `mouse:275`, replace both occurrences.
 
 ## Configure rings
 
-Orbit reads `~/.config/omarchy/orbit.json`. If the file does not exist, it uses the built-in default ring.
+Orbit reads `~/.config/omarchy/orbit.json`. If the file does not exist, it uses the built-in default rings.
+
+The bundled default/example includes:
+
+- `main`: Launcher, Dictation, Clipboard, Dev, Screenshot, Window, Back, Emoji
+- `window`: float, fullscreen, close, scratchpad, move-to-scratchpad, previous/next workspace
+- `dev`: terminal, editor, files, model usage, bar settings, restart shell, reload Hyprland
 
 Start from the example:
 
@@ -74,7 +80,7 @@ Start from the example:
 cp ~/.config/omarchy/plugins/orbit/config.example.json ~/.config/omarchy/orbit.json
 ```
 
-Shape:
+Minimal shape:
 
 ```json
 {
@@ -83,19 +89,17 @@ Shape:
     {
       "id": "main",
       "label": "Orbit",
-      "description": "Move toward a slice, then release.",
       "actions": [
-        { "label": "Terminal", "icon": "", "command": "uwsm-app -- xdg-terminal-exec" },
-        { "label": "Work", "icon": "󰓇", "ring": "work" },
-        { "label": "Close", "icon": "", "close": true }
+        { "label": "Launcher", "icon": "󰍉", "command": "omarchy-shell shell toggle omarchy.launcher '{}'" },
+        { "label": "Dev", "icon": "", "ring": "dev" }
       ]
     },
     {
-      "id": "work",
-      "label": "Work",
+      "id": "dev",
+      "label": "Dev",
       "actions": [
-        { "label": "Email", "icon": "", "command": "omarchy-launch-webapp https://app.hey.com" },
-        { "label": "Back", "icon": "", "ring": "main" }
+        { "label": "Main", "icon": "󰁍", "ring": "main" },
+        { "label": "Restart Shell", "icon": "", "command": "omarchy restart shell" }
       ]
     }
   ]

@@ -44,6 +44,7 @@ Features:
 - Opens an overlay ring at the current cursor position
 - Hover-by-direction slice selection with release-to-activate behavior
 - Configurable rings/actions via `~/.config/omarchy/orbit.json`
+- Bundled default/example rings for everyday actions, window controls, and development tools
 - Supports nested rings, shell commands, direct argv commands, and close-only slices
 - Includes helper scripts to open at cursor, activate on release, and sniff mouse button codes
 

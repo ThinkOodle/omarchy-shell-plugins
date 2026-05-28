@@ -4,25 +4,142 @@
     {
       "id": "main",
       "label": "Orbit",
-      "description": "Move toward a slice, then release.",
+      "description": "Everyday mouse-first actions.",
       "actions": [
-        { "label": "Terminal", "icon": "", "command": "uwsm-app -- xdg-terminal-exec" },
-        { "label": "Browser", "icon": "", "command": "omarchy-launch-browser" },
-        { "label": "Files", "icon": "", "command": "uwsm-app -- nautilus --new-window" },
-        { "label": "Editor", "icon": "", "command": "omarchy-launch-editor" },
-        { "label": "Clipboard", "icon": "", "command": "omarchy-shell shell toggle omarchy.clipboard" },
-        { "label": "Emoji", "icon": "󰞅", "command": "omarchy-shell shell toggle omarchy.emojis '{}'" },
-        { "label": "Screenshot", "icon": "", "command": "omarchy-capture-screenshot" },
-        { "label": "Lock", "icon": "", "command": "omarchy system lock" }
+        {
+          "label": "Launcher",
+          "icon": "󰍉",
+          "command": "omarchy-shell shell toggle omarchy.launcher '{}'"
+        },
+        {
+          "label": "Dictation",
+          "icon": "󰍬",
+          "command": "voxtype record toggle"
+        },
+        {
+          "label": "Clipboard",
+          "icon": "",
+          "command": "omarchy-shell shell toggle omarchy.clipboard"
+        },
+        {
+          "label": "Dev",
+          "icon": "",
+          "ring": "dev"
+        },
+        {
+          "label": "Screenshot",
+          "icon": "",
+          "command": "omarchy capture screenshot region copy"
+        },
+        {
+          "label": "Window",
+          "icon": "󰖲",
+          "ring": "window"
+        },
+        {
+          "label": "Back",
+          "icon": "",
+          "command": "hyprctl dispatch sendshortcut ALT,LEFT,activewindow"
+        },
+        {
+          "label": "Emoji",
+          "icon": "󰞅",
+          "command": "omarchy-shell shell toggle omarchy.emojis"
+        }
       ]
     },
     {
-      "id": "work",
-      "label": "Work",
+      "id": "window",
+      "label": "Window",
+      "description": "Window and workspace controls.",
       "actions": [
-        { "label": "Email", "icon": "", "command": "omarchy-launch-webapp https://app.hey.com" },
-        { "label": "Calendar", "icon": "", "command": "omarchy-launch-webapp https://app.hey.com/calendar/weeks/" },
-        { "label": "Back", "icon": "", "ring": "main" }
+        {
+          "label": "Main",
+          "icon": "󰁍",
+          "ring": "main"
+        },
+        {
+          "label": "Float",
+          "icon": "󰖯",
+          "command": "hyprctl dispatch togglefloating"
+        },
+        {
+          "label": "Fullscreen",
+          "icon": "󰊓",
+          "command": "hyprctl dispatch fullscreen"
+        },
+        {
+          "label": "Close",
+          "icon": "",
+          "command": "hyprctl dispatch killactive"
+        },
+        {
+          "label": "Scratchpad",
+          "icon": "󰏖",
+          "command": "hyprctl dispatch togglespecialworkspace scratchpad"
+        },
+        {
+          "label": "To Scratch",
+          "icon": "󰘕",
+          "command": "hyprctl dispatch movetoworkspacesilent special:scratchpad"
+        },
+        {
+          "label": "Prev WS",
+          "icon": "",
+          "command": "hyprctl dispatch workspace e-1"
+        },
+        {
+          "label": "Next WS",
+          "icon": "",
+          "command": "hyprctl dispatch workspace e+1"
+        }
+      ]
+    },
+    {
+      "id": "dev",
+      "label": "Dev",
+      "description": "Development and shell maintenance.",
+      "actions": [
+        {
+          "label": "Main",
+          "icon": "󰁍",
+          "ring": "main"
+        },
+        {
+          "label": "Terminal",
+          "icon": "",
+          "command": "omarchy launch terminal"
+        },
+        {
+          "label": "Editor",
+          "icon": "",
+          "command": "omarchy-launch-editor"
+        },
+        {
+          "label": "Files",
+          "icon": "",
+          "command": "omarchy launch nautilus"
+        },
+        {
+          "label": "Model Usage",
+          "icon": "󰚩",
+          "command": "omarchy-shell -q model-usage toggle"
+        },
+        {
+          "label": "Bar Settings",
+          "icon": "",
+          "command": "omarchy launch bar settings"
+        },
+        {
+          "label": "Restart Shell",
+          "icon": "",
+          "command": "omarchy restart shell"
+        },
+        {
+          "label": "Reload Hypr",
+          "icon": "󰑓",
+          "command": "hyprctl reload"
+        }
       ]
     }
   ]
