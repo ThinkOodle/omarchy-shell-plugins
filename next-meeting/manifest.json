@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "next-meeting",
   "name": "NextMeeting",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "tylerbarnett3",
   "license": "MIT",
-  "description": "Shows your next Google Meet event in the Omarchy bar and opens it on click.",
+  "description": "Shows your next Meet/Zoom event in the Omarchy bar with a full-day agenda popup.",
   "kinds": ["bar-widget"],
   "activation": "on-demand",
   "entryPoints": {
@@ -13,7 +13,7 @@
   },
   "barWidget": {
     "displayName": "NextMeeting",
-    "description": "Shows your next calendar event and opens Google Meet links.",
+    "description": "Shows your next video meeting, opens a full-day agenda panel, and joins Meet/Zoom links.",
     "category": "Productivity",
     "allowMultiple": false,
     "defaults": {
@@ -31,7 +31,7 @@
         "key": "refreshIntervalSec",
         "type": "integer",
         "label": "Auto-fetch interval (seconds)",
-        "description": "How often NextMeeting checks gcalcli for calendar changes. Right-click the widget to refresh manually.",
+        "description": "How often NextMeeting checks gcalcli for calendar changes. Middle-click the widget to refresh manually.",
         "defaultValue": 1800,
         "min": 60,
         "max": 86400,
@@ -41,14 +41,14 @@
         "key": "scheduleClearText",
         "type": "string",
         "label": "Schedule clear text",
-        "description": "Text shown when there are no more meetings today.",
+        "description": "Text shown when there are no more joinable video meetings today.",
         "defaultValue": "No more meetings today ✅"
       },
       {
         "key": "lookaheadDays",
         "type": "integer",
         "label": "Lookahead window (days)",
-        "description": "How many days ahead NextMeeting should look for the next event.",
+        "description": "How many days ahead NextMeeting should ask gcalcli for agenda data.",
         "defaultValue": 7,
         "min": 1,
         "max": 30,
@@ -57,8 +57,8 @@
       {
         "key": "maxDisplayChars",
         "type": "integer",
-        "label": "Maximum display characters",
-        "description": "Maximum length of meeting text before it is truncated with ellipsis.",
+        "label": "Maximum bar display characters",
+        "description": "Maximum length of the bar label before it is truncated with ellipsis.",
         "defaultValue": 42,
         "min": 12,
         "max": 120,
@@ -67,8 +67,8 @@
       {
         "key": "meetOpenMode",
         "type": "enum",
-        "label": "Meet open mode",
-        "description": "How NextMeeting opens Google Meet links. Chrome app mode is the default for better Google Meet background effects on many Linux systems.",
+        "label": "Meeting open mode",
+        "description": "How NextMeeting opens join links. Chrome app mode applies to Google Meet; Zoom and other providers use the system URL handler unless custom-command is selected.",
         "options": ["chrome-app", "system-browser", "custom-command"],
         "defaultValue": "chrome-app"
       },
@@ -76,21 +76,21 @@
         "key": "meetOpenCommand",
         "type": "string",
         "label": "Custom open command",
-        "description": "Used only when Meet open mode is custom-command. The Meet URL is available as $NEXT_MEETING_URL.",
+        "description": "Used only when Meeting open mode is custom-command. The join URL is available as $NEXT_MEETING_URL and $MEETING_URL.",
         "defaultValue": ""
       },
       {
         "key": "chromeAppFlags",
         "type": "string",
         "label": "Chrome app flags",
-        "description": "Space-separated flags passed to google-chrome-stable in chrome-app mode. Defaults work around common Wayland/GPU quirks on Hyprland; clear this if Chrome runs well natively for you.",
+        "description": "Space-separated flags passed to Chrome for Google Meet chrome-app mode. Defaults work around common Wayland/GPU quirks on Hyprland; clear this if Chrome runs well natively for you.",
         "defaultValue": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing"
       },
       {
         "key": "calendars",
         "type": "multiselect",
         "label": "Calendars",
-        "description": "Calendars to consider when looking for the next meeting. Leave empty to use every calendar on the account.",
+        "description": "Calendars to consider. Leave empty to use every calendar on the account.",
         "placeholderText": "Search calendars...",
         "emptyText": "No calendars found. Run 'gcalcli list' in a terminal.",
         "noSelectionText": "All calendars",

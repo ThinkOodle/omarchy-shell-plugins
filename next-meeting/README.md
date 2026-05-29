@@ -1,25 +1,26 @@
 # NextMeeting
 
-NextMeeting is an Omarchy shell bar widget that shows your next Google Calendar event and opens its Google Meet link on click.
+NextMeeting is an Omarchy shell bar widget that shows your next joinable video meeting and opens a full-day calendar panel on click.
 
-It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read your calendar from the command line.
+It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read Google Calendar from the command line.
 
 ## Features
 
-- Shows the next non-declined calendar event for today that has a Google Meet link.
-- Ignores calendar events without a `https://meet.google.com/...` link.
-- Shows configurable schedule-clear text when there are no more meetings today.
-- Left-click opens the next Google Meet link, when one is available.
-- Right-click refreshes the calendar immediately.
-- Auto-refresh interval is configurable.
-- Exposes `refresh` and `open` over Omarchy shell IPC for keybindings.
+- Shows the next non-declined Google Meet or Zoom meeting for today in the bar.
+- Left-click opens a keyboard-friendly agenda panel that can flip through the configured lookahead window.
+- Meeting rows show a clickable **Meet**, **Zoom**, or generic video join button.
+- Right-click opens inline plugin settings; no central settings pane required.
+- Middle-click refreshes calendar data immediately.
+- Google Meet can open in a Chrome app window; Zoom and other providers use the system URL handler by default.
+- Exposes `show`, `toggle`, `refresh`, `open`/`join`, and `settings` over Omarchy shell IPC.
 
 ## Requirements
 
 - Omarchy shell with plugin support.
 - `gcalcli` installed and authenticated.
-- `google-chrome-stable` is recommended for the default Chrome app launch mode. If it is not installed, NextMeeting falls back to your system browser.
-- Optional: `jq` and `hyprctl` for nudging the opened Meet window into Hyprland tiling.
+- `python3` (already required by `gcalcli`).
+- `google-chrome-stable`, `google-chrome`, or `chromium` is recommended for Google Meet chrome-app mode. If none are installed, NextMeeting falls back to your system URL handler.
+- Optional: `jq` and `hyprctl` for nudging Google Meet Chrome app windows into Hyprland tiling.
 
 ## Install
 
@@ -35,16 +36,6 @@ Then add `next-meeting` to your bar layout in `~/.config/omarchy/shell.json`:
 {
   "id": "next-meeting"
 }
-```
-
-Example left-side layout:
-
-```json
-"left": [
-  { "id": "omarchy" },
-  { "id": "workspaces" },
-  { "id": "next-meeting" }
-]
 ```
 
 Restart the shell if it does not appear automatically:
@@ -71,33 +62,33 @@ If that command cannot read your calendar, NextMeeting will stay hidden.
 
 ## Usage
 
-- Left-click: open the next event's Google Meet link.
-- Right-click: refresh calendar data immediately.
+- Left-click: show the agenda panel.
+- Click a row's **Meet**, **Zoom**, or video button: join that meeting.
+- Right-click: open NextMeeting settings.
+- Middle-click: refresh calendar data immediately.
+- Keyboard in the panel: `h`/`l` changes day, `j`/`k` selects, `Enter` joins the selected video meeting, `r` refreshes, `s` opens/saves settings, `Esc` closes.
 
-By default, NextMeeting auto-refreshes every 30 minutes. Right-click is useful when you just added or changed a meeting and do not want to wait for the next automatic refresh.
+By default, NextMeeting auto-refreshes every 30 minutes. Middle-click is useful when you just added or changed a meeting and do not want to wait for the next automatic refresh.
 
 ### IPC
 
-The widget exposes two IPC functions on the `next-meeting` target, so you can bind them to keys:
+The widget exposes IPC functions on the `next-meeting` target:
 
 ```bash
+omarchy-shell ipc call next-meeting show
+omarchy-shell ipc call next-meeting toggle
 omarchy-shell ipc call next-meeting refresh
-omarchy-shell ipc call next-meeting open
+omarchy-shell ipc call next-meeting open      # join the next meeting
+omarchy-shell ipc call next-meeting settings
 ```
 
-`open` is a no-op when there is no current Meet link.
+`open`/`join` is a no-op when there is no current joinable meeting.
 
 ## Configure
 
-NextMeeting exposes a settings schema to Omarchy's bar settings panel. Open the panel and edit settings inline:
+Right-click the widget, edit settings inline, then click **Save**. The widget writes changes to `~/.config/omarchy/shell.json` when the shell exposes `updateEntryInline`.
 
-```bash
-omarchy launch bar settings
-```
-
-Select `NextMeeting`. The panel writes changes to `~/.config/omarchy/shell.json` and the shell hot-reloads.
-
-You can also edit the `next-meeting` entry in `~/.config/omarchy/shell.json` directly:
+You can also edit the `next-meeting` entry directly:
 
 ```json
 {
@@ -109,7 +100,7 @@ You can also edit the `next-meeting` entry in `~/.config/omarchy/shell.json` dir
   "meetOpenMode": "chrome-app",
   "meetOpenCommand": "",
   "chromeAppFlags": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing",
-  "calendars": ""
+  "calendars": []
 }
 ```
 
@@ -117,52 +108,34 @@ Settings:
 
 | Setting | Default | Description |
 | --- | ---: | --- |
-| `refreshIntervalSec` | `1800` | Seconds between automatic calendar checks. Minimum `60`, maximum `86400`. |
-| `scheduleClearText` | `No more meetings today ✅` | Text shown when there are no more meetings today. |
-| `lookaheadDays` | `7` | How many days `gcalcli` scans for the next event. |
-| `maxDisplayChars` | `42` | Maximum meeting label length before truncating with `...`. |
-| `meetOpenMode` | `chrome-app` | How to open Meet links: `chrome-app`, `system-browser`, or `custom-command`. |
-| `meetOpenCommand` | empty | Command used only when `meetOpenMode` is `custom-command`. The Meet URL is available as `$NEXT_MEETING_URL`. |
-| `chromeAppFlags` | see above | Space-separated flags passed to `google-chrome-stable` in `chrome-app` mode. Defaults work around common Wayland/GPU quirks on Hyprland; clear if Chrome runs natively. |
-| `calendars` | empty | Comma-separated calendar names to consider. Empty means all calendars on the account. Run `gcalcli list` to see the names. |
+| `refreshIntervalSec` | `1800` | Seconds between automatic calendar checks. |
+| `scheduleClearText` | `No more meetings today ✅` | Text shown when there are no more joinable video meetings today. |
+| `lookaheadDays` | `7` | How many days `gcalcli` fetches and how far the agenda panel can flip forward. |
+| `maxDisplayChars` | `42` | Maximum bar label length before truncating with `...`. |
+| `meetOpenMode` | `chrome-app` | `chrome-app`, `system-browser`, or `custom-command`. Chrome app mode applies to Google Meet; Zoom uses the system URL handler unless custom mode is selected. |
+| `meetOpenCommand` | empty | Command used only in `custom-command` mode. `$NEXT_MEETING_URL` and `$MEETING_URL` contain the join URL. |
+| `chromeAppFlags` | see above | Flags passed to Chrome for Google Meet chrome-app mode. |
+| `calendars` | empty | Calendar names to consider. Empty means all calendars. Inline settings accepts comma-separated names; JSON may use an array. |
 
-## Meeting Launch Modes
+## Meeting Detection
 
-By default, NextMeeting opens meetings with `google-chrome-stable` in Chrome app mode. Google Meet background effects (and sometimes device handling) are generally more reliable in Google Chrome Stable on Linux.
+Every refresh runs `gcalcli agenda` with TSV output and details for title, conference, URL, description, and location. NextMeeting treats these as joinable video meetings:
 
-For alternative setups, set `meetOpenMode` to `system-browser` or `custom-command`. The Meet URL is available as `$NEXT_MEETING_URL`:
+- Google Meet links (`meet.google.com`).
+- Zoom links (`zoom.us`, `zoom.com`, `zoomgov.com`) from conference fields, descriptions, or locations.
+- Common video providers such as Teams, Webex, and Whereby are shown with a generic join button.
 
-```json
-{
-  "id": "next-meeting",
-  "meetOpenMode": "custom-command",
-  "meetOpenCommand": "firefox --new-window \"$NEXT_MEETING_URL\""
-}
-```
-
-The Hyprland tiling nudge only runs for the default `chrome-app` mode, and only when both `jq` and `hyprctl` are installed.
-
-## How It Works
-
-Every refresh runs:
-
-```bash
-gcalcli agenda <start> <end> --nodeclined --tsv --details title --details conference --details url
-```
-
-The widget scans for events within the configured lookahead window, but it only displays events that include a Google Meet link. A meeting will remain in the widget for 5 minutes past its start time, after which the next Google Meet event on your calendar will take its place.
-
-If the next event is not today, NextMeeting shows the no-more-meetings text instead.
-
-The Meet URL is cached on each fetch, so clicking the widget does not run `gcalcli` again.
+The bar label shows the next joinable video meeting today. The panel starts on today and can flip through the lookahead window, with join buttons only on rows where a video link was found.
 
 ## Files
 
-- `manifest.json`: plugin metadata and GUI settings schema.
-- `Widget.qml`: bar entry — uses the shared `BarWidget` / `WidgetButton` from Omarchy's UI library.
-- `Main.qml`: refresh timer, settings, IPC, and process wiring.
-- `scripts/next-event.sh`: fetches the next calendar event and emits JSON (label, tooltip, Meet URL).
-- `scripts/next-event-open.sh`: opens a given Meet URL using the configured launch mode. If `jq` and `hyprctl` are available in `chrome-app` mode, it also tries to nudge the Chrome app window into Hyprland tiling.
+- `manifest.json`: plugin metadata and settings schema.
+- `Widget.qml`: bar entry, day-agenda panel, and inline settings UI.
+- `Main.qml`: refresh timer, process wiring, payload parsing, and meeting launching.
+- `scripts/next-event.sh`: fetches agenda TSV from `gcalcli`.
+- `scripts/agenda-to-json.py`: converts agenda TSV into the widget JSON payload.
+- `scripts/next-event-open.sh`: opens a join URL using the configured launch mode.
+- `scripts/list-calendars.sh`: emits calendar options for schema-based settings UIs.
 
 ## Troubleshooting
 
@@ -173,8 +146,8 @@ If the widget does not show anything:
 3. Confirm `next-meeting` is present in `~/.config/omarchy/shell.json`.
 4. Restart the shell: `omarchy restart shell`
 
-If left-click does not open Meet:
+If a meeting has no join button:
 
-1. Confirm the event has a Google Meet link.
-2. Confirm `google-chrome-stable` is installed (or set `meetOpenMode` to `system-browser`).
-3. Right-click the widget to refresh, then left-click again.
+1. Confirm the event contains a Meet or Zoom URL in the conference field, description, or location.
+2. Middle-click the widget to refresh.
+3. Run the agenda command in a terminal and verify the link appears in `gcalcli` output.

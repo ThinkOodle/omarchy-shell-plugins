@@ -55,23 +55,25 @@ Dependencies:
 
 ### `next-meeting`
 
-Shows your next calendar event in the Omarchy bar and opens the Google Meet link on click.
+Shows your next joinable video meeting in the Omarchy bar, with a full-day agenda popup.
 
 Features:
 
-- Uses `gcalcli` agenda data for upcoming events
-- Only includes calendar events that have a Google Meet link
-- Shows the next event for today, then falls back to a schedule-clear message
-- Opens Google Meet in a Chrome app window by default and nudges it into Hyprland tiling if possible
+- Uses `gcalcli` agenda data for the configured lookahead window
+- Shows the next Google Meet or Zoom meeting for today, then falls back to a schedule-clear message
+- Left-click opens an agenda panel with day navigation and clickable Meet/Zoom/video join buttons on meeting rows
+- Right-click opens inline plugin settings; middle-click refreshes
+- Opens Google Meet in a Chrome app window by default and uses the system URL handler for Zoom unless custom mode is selected
 - Can use the system browser or a custom command instead
 
 Dependencies:
 
 - `gcalcli`
-- `google-chrome-stable` is recommended for the default Chrome app launch mode because Google Meet background effects are more reliable there on many Linux setups
-- Optional: `jq` and `hyprctl` for nudging the opened Meet window into Hyprland tiling
+- `python3` (already required by `gcalcli`)
+- `google-chrome-stable`, `google-chrome`, or `chromium` is recommended for Google Meet chrome-app mode
+- Optional: `jq` and `hyprctl` for nudging opened Meet windows into Hyprland tiling
 
-Settings live in `~/.config/omarchy/shell.json` and can be edited via `omarchy launch bar settings`. Exposes `refresh` and `open` over Omarchy shell IPC on the `next-meeting` target.
+Settings live in `~/.config/omarchy/shell.json` and can be edited inline by right-clicking the widget. Exposes `show`, `toggle`, `refresh`, `open`/`join`, and `settings` over Omarchy shell IPC on the `next-meeting` target.
 
 ## Install locally
 

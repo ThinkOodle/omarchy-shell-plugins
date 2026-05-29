@@ -12,6 +12,11 @@ Item {
   property string stateClass: "off"
   property bool hasMeeting: false
   property string meetUrl: ""
+  property string meetingProvider: ""
+  property var events: []
+  property string today: ""
+  property string todayLabel: ""
+  property string generatedAt: ""
   property bool initialLoadPending: true
   property bool manualRefreshPending: false
 
@@ -25,8 +30,9 @@ Item {
   readonly property string chromeAppFlags: stringSetting("chromeAppFlags",
     "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing")
   // Accept either a JSON array (new multiselect format) or a CSV string
-  // (legacy). Calendars are passed downstream as repeated argv entries so
-  // calendar names containing commas survive intact.
+  // (legacy / inline settings). Calendars are passed downstream as repeated
+  // argv entries so calendar names containing commas survive when stored as
+  // arrays in shell.json.
   readonly property var calendars: {
     var v = setting("calendars", [])
     var out = []
@@ -74,6 +80,7 @@ Item {
 
   function refresh(showLoading) {
     if (showLoading === true && isLoading) return
+    if (refreshProcess.running) return
 
     var shouldShowLoading = showLoading === true || initialLoadPending
     if (showLoading === true) manualRefreshPending = true
@@ -81,6 +88,8 @@ Item {
       text = loadingText
       tooltipText = ""
       hasMeeting = false
+      meetUrl = ""
+      meetingProvider = ""
       stateClass = "on"
     }
 
@@ -96,10 +105,19 @@ Item {
   }
 
   function openNextEvent() {
-    if (!hasMeeting || meetUrl === "") return
+    openUrl(meetUrl)
+  }
+
+  function openEvent(event) {
+    if (!event) return
+    openUrl(String(event.url || ""))
+  }
+
+  function openUrl(url) {
+    if (!url) return
     openProcess.command = [
       openEventScriptPath,
-      meetUrl,
+      url,
       meetOpenMode,
       meetOpenCommand,
       chromeAppFlags
@@ -117,6 +135,11 @@ Item {
       tooltipText = ""
       hasMeeting = false
       meetUrl = ""
+      meetingProvider = ""
+      events = []
+      today = ""
+      todayLabel = ""
+      generatedAt = ""
       stateClass = "off"
       return
     }
@@ -127,20 +150,24 @@ Item {
       tooltipText = parsed.tooltip ? String(parsed.tooltip) : ""
       hasMeeting = parsed.hasMeeting === true
       meetUrl = parsed.url ? String(parsed.url) : ""
+      meetingProvider = parsed.provider ? String(parsed.provider) : ""
+      events = Array.isArray(parsed.events) ? parsed.events : []
+      today = parsed.today ? String(parsed.today) : ""
+      todayLabel = parsed.todayLabel ? String(parsed.todayLabel) : ""
+      generatedAt = parsed.generatedAt ? String(parsed.generatedAt) : ""
       stateClass = parsed.class ? String(parsed.class) : (text === "" ? "off" : "on")
     } catch (e) {
       text = ""
       tooltipText = ""
       hasMeeting = false
       meetUrl = ""
+      meetingProvider = ""
+      events = []
+      today = ""
+      todayLabel = ""
+      generatedAt = ""
       stateClass = "off"
     }
-  }
-
-  IpcHandler {
-    target: "next-meeting"
-    function refresh(): string { root.refresh(true); return "ok" }
-    function open(): string { root.openNextEvent(); return root.hasMeeting ? "ok" : "no-meeting" }
   }
 
   Timer {
