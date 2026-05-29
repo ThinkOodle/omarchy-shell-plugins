@@ -575,6 +575,8 @@ Item {
         property var action: root.actions[index] || ({})
         property bool selected: index === root.selectedIndex
         readonly property real theta: root.angleForIndex(index)
+        readonly property string iconGlyph: action.icon || String(index + 1)
+        readonly property var iconBounds: iconMetrics.tightBoundingRect(iconGlyph)
 
         width: root.itemSize
         height: root.itemSize
@@ -593,16 +595,25 @@ Item {
           border.width: Math.max(1, Style.space(actionItem.selected ? 3 : 2))
         }
 
+        FontMetrics {
+          id: iconMetrics
+          font.family: root.iconFontFamily
+          font.pixelSize: Style.font.display
+        }
+
         Text {
-          anchors.fill: parent
-          text: actionItem.action.icon || String(index + 1)
+          id: iconText
+          text: actionItem.iconGlyph
           color: actionItem.selected ? Color.background : root.foreground
           font.family: root.iconFontFamily
           font.pixelSize: Style.font.display
-          fontSizeMode: Text.FixedSize
-          horizontalAlignment: Text.AlignHCenter
-          verticalAlignment: Text.AlignVCenter
           maximumLineCount: 1
+
+          // Nerd Font glyphs have uneven bearings. Center the tight glyph
+          // bounds, not the font's advance box, so icons sit visually in the
+          // middle of the circular buttons.
+          x: actionItem.width / 2 - (actionItem.iconBounds.x + actionItem.iconBounds.width / 2)
+          y: actionItem.height / 2 - (baselineOffset + actionItem.iconBounds.y + actionItem.iconBounds.height / 2)
         }
 
         MouseArea {
