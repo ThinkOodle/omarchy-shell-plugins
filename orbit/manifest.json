@@ -3,7 +3,7 @@
   "id": "orbit",
   "name": "Orbit",
   "version": "0.1.0",
-  "author": "Ryan Florence / pi",
+  "author": "Ryan Hughes",
   "license": "MIT",
   "description": "A cursor-centered radial launcher for mouse-button workflows.",
   "kinds": ["overlay"],
