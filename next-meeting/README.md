@@ -8,10 +8,11 @@ It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read Google Calendar 
 
 - Shows the next non-declined Google Meet or Zoom meeting for today in the bar.
 - Left-click opens a keyboard-friendly agenda panel that can flip through the configured lookahead window.
+- Today's agenda shows a live **Now** marker so you can see where you are in the day.
 - Meeting rows show a clickable **Meet**, **Zoom**, or generic video join button.
-- Right-click opens inline plugin settings; no central settings pane required.
+- Right-click opens inline plugin settings, including a calendar multi-select populated from `gcalcli list`.
 - Middle-click refreshes calendar data immediately.
-- Google Meet can open in a Chrome app window; Zoom and other providers use the system URL handler by default.
+- Meeting links open in your default browser by default, with an optional custom command.
 - Exposes `show`, `toggle`, `refresh`, `open`/`join`, and `settings` over Omarchy shell IPC.
 
 ## Requirements
@@ -19,8 +20,7 @@ It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read Google Calendar 
 - Omarchy shell with plugin support.
 - `gcalcli` installed and authenticated.
 - `python3` (already required by `gcalcli`).
-- `google-chrome-stable`, `google-chrome`, or `chromium` is recommended for Google Meet chrome-app mode. If none are installed, NextMeeting falls back to your system URL handler.
-- Optional: `jq` and `hyprctl` for nudging Google Meet Chrome app windows into Hyprland tiling.
+- `xdg-open` for opening join links in your default browser.
 
 ## Install
 
@@ -97,9 +97,8 @@ You can also edit the `next-meeting` entry directly:
   "scheduleClearText": "No more meetings today ✅",
   "lookaheadDays": 7,
   "maxDisplayChars": 42,
-  "meetOpenMode": "chrome-app",
+  "meetOpenMode": "system-browser",
   "meetOpenCommand": "",
-  "chromeAppFlags": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing",
   "calendars": []
 }
 ```
@@ -112,10 +111,9 @@ Settings:
 | `scheduleClearText` | `No more meetings today ✅` | Text shown when there are no more joinable video meetings today. |
 | `lookaheadDays` | `7` | How many days `gcalcli` fetches and how far the agenda panel can flip forward. |
 | `maxDisplayChars` | `42` | Maximum bar label length before truncating with `...`. |
-| `meetOpenMode` | `chrome-app` | `chrome-app`, `system-browser`, or `custom-command`. Chrome app mode applies to Google Meet; Zoom uses the system URL handler unless custom mode is selected. |
+| `meetOpenMode` | `system-browser` | `system-browser` or `custom-command`. Legacy `chrome-app` values are treated as `system-browser`. |
 | `meetOpenCommand` | empty | Command used only in `custom-command` mode. `$NEXT_MEETING_URL` and `$MEETING_URL` contain the join URL. |
-| `chromeAppFlags` | see above | Flags passed to Chrome for Google Meet chrome-app mode. |
-| `calendars` | empty | Calendar names to consider. Empty means all calendars. Inline settings accepts comma-separated names; JSON may use an array. |
+| `calendars` | empty | Calendar names to consider. Empty means all calendars. The settings UI uses a multi-select; JSON should use an array. Legacy comma-separated strings are still accepted. |
 
 ## Meeting Detection
 
@@ -125,7 +123,7 @@ Every refresh runs `gcalcli agenda` with TSV output and details for title, confe
 - Zoom links (`zoom.us`, `zoom.com`, `zoomgov.com`) from conference fields, descriptions, or locations.
 - Common video providers such as Teams, Webex, and Whereby are shown with a generic join button.
 
-The bar label shows the next joinable video meeting today. The panel starts on today and can flip through the lookahead window, with join buttons only on rows where a video link was found.
+The bar label shows the next joinable video meeting today. The panel starts on today and can flip through the lookahead window, with a live **Now** marker on today's agenda and join buttons only on rows where a video link was found.
 
 ## Files
 

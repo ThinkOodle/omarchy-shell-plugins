@@ -25,10 +25,8 @@ Item {
   readonly property string scheduleClearText: stringSetting("scheduleClearText", "No more meetings today ✅")
   readonly property int lookaheadDays: intSetting("lookaheadDays", 7, 1, 30)
   readonly property int maxDisplayChars: intSetting("maxDisplayChars", 42, 12, 120)
-  readonly property string meetOpenMode: stringSetting("meetOpenMode", "chrome-app")
+  readonly property string meetOpenMode: stringSetting("meetOpenMode", "system-browser")
   readonly property string meetOpenCommand: stringSetting("meetOpenCommand", "")
-  readonly property string chromeAppFlags: stringSetting("chromeAppFlags",
-    "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing")
   // Accept either a JSON array (new multiselect format) or a CSV string
   // (legacy / inline settings). Calendars are passed downstream as repeated
   // argv entries so calendar names containing commas survive when stored as
@@ -119,8 +117,7 @@ Item {
       openEventScriptPath,
       url,
       meetOpenMode,
-      meetOpenCommand,
-      chromeAppFlags
+      meetOpenCommand
     ]
     openProcess.running = true
   }

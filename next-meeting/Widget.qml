@@ -17,6 +17,10 @@ BarWidget {
   property bool refreshFlash: false
   property int selectedEventIndex: 0
   property int selectedDayOffset: 0
+  property var availableCalendars: []
+  property bool calendarsLoading: false
+  property string calendarsStatusText: ""
+  property var now: new Date()
 
   readonly property color foreground: bar ? bar.foreground : Color.foreground
   readonly property color background: Color.popups.background
@@ -31,6 +35,13 @@ BarWidget {
   readonly property string selectedDateString: dateStringForOffset(main.today, selectedDayOffset)
   readonly property string selectedDateLabel: labelForDate(selectedDateString, selectedDayOffset)
   readonly property var dayEvents: eventsForDate(selectedDateString)
+  readonly property string currentDateString: dateString(now)
+  readonly property int currentTimeMinutes: minutesForDate(now)
+  readonly property string currentTimeLabel: clockLabel(now)
+  readonly property bool selectedDayIsToday: selectedDateString === currentDateString
+  readonly property int nowMarkerIndex: computeNowMarkerIndex()
+  readonly property var calendarOptions: calendarOptionsWithSelected(availableCalendars, draftValue("calendars", []))
+  readonly property string listCalendarsScriptPath: pathFromUrl(Qt.resolvedUrl("scripts/list-calendars.sh"))
 
   function close() {
     popupOpen = false
@@ -59,6 +70,12 @@ BarWidget {
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
   function alpha(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
 
+  function pathFromUrl(url) {
+    var value = String(url)
+    if (value.indexOf("file://") === 0) return decodeURIComponent(value.substring(7))
+    return value
+  }
+
   function parseIsoDate(value) {
     var parts = String(value || "").split("-")
     if (parts.length >= 3) {
@@ -78,6 +95,45 @@ BarWidget {
     var date = parseIsoDate(today)
     date.setDate(date.getDate() + Number(offset || 0))
     return dateString(date)
+  }
+
+  function minutesForDate(date) {
+    if (!date) return 0
+    return date.getHours() * 60 + date.getMinutes()
+  }
+
+  function timeToMinutes(value) {
+    var parts = String(value || "").split(":")
+    if (parts.length < 2) return -1
+    var hours = Number(parts[0])
+    var minutes = Number(parts[1])
+    if (!isFinite(hours) || !isFinite(minutes)) return -1
+    return hours * 60 + minutes
+  }
+
+  function clockLabel(date) {
+    var hours24 = date.getHours()
+    var minutes = String(date.getMinutes()).padStart(2, "0")
+    var suffix = hours24 >= 12 ? "pm" : "am"
+    var hours = hours24 % 12
+    if (hours === 0) hours = 12
+    return hours + ":" + minutes + suffix
+  }
+
+  function computeNowMarkerIndex() {
+    if (!selectedDayIsToday) return -1
+    var events = dayEvents || []
+    for (var i = 0; i < events.length; i++) {
+      var event = events[i] || ({})
+      if (event.allDay === true || !event.startTime) continue
+      var start = timeToMinutes(event.startTime)
+      if (start < 0) continue
+      var end = timeToMinutes(event.endTime)
+      if (end < 0) end = start
+      if (String(event.endDate || event.date || "") !== String(event.date || "")) end = 24 * 60
+      if (end >= currentTimeMinutes || start >= currentTimeMinutes) return i
+    }
+    return events.length
   }
 
   function labelForDate(dateString, offset) {
@@ -112,9 +168,8 @@ BarWidget {
       scheduleClearText: "No more meetings today ✅",
       lookaheadDays: 7,
       maxDisplayChars: 42,
-      meetOpenMode: "chrome-app",
+      meetOpenMode: "system-browser",
       meetOpenCommand: "",
-      chromeAppFlags: "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing",
       calendars: []
     }
   }
@@ -143,6 +198,97 @@ BarWidget {
     return String(value || "")
   }
 
+  function calendarOptionsWithSelected(options, selectedValue) {
+    var out = []
+    var seen = ({})
+
+    function add(option, fallbackDescription) {
+      var value = ""
+      var label = ""
+      var description = fallbackDescription || ""
+      if (typeof option === "string") {
+        value = option
+        label = option
+      } else if (option) {
+        value = String(option.value || option.label || "")
+        label = String(option.label || option.value || "")
+        description = String(option.description || description || "")
+      }
+      value = String(value || "").trim()
+      if (value === "") return
+      if (label === "") label = value
+      var key = "$" + value
+      if (seen[key] === true) return
+      seen[key] = true
+      out.push({ value: value, label: label, description: description })
+    }
+
+    var source = options || []
+    for (var i = 0; i < source.length; i++) add(source[i], "")
+
+    var selected = normalizeCalendars(selectedValue)
+    for (var j = 0; j < selected.length; j++) add(selected[j], "Configured")
+    return out
+  }
+
+  function selectedCalendarCount() {
+    return normalizeCalendars(draftValue("calendars", [])).length
+  }
+
+  function selectedCalendarSummary() {
+    var selected = normalizeCalendars(draftValue("calendars", []))
+    if (selected.length === 0) return "All calendars"
+    if (selected.length === 1) return selected[0]
+    return selected.length + " calendars selected"
+  }
+
+  function calendarSelected(value) {
+    return normalizeCalendars(draftValue("calendars", [])).indexOf(String(value || "")) >= 0
+  }
+
+  function toggleDraftCalendar(value) {
+    var calendar = String(value || "").trim()
+    if (calendar === "") return
+    var selected = normalizeCalendars(draftValue("calendars", []))
+    var index = selected.indexOf(calendar)
+    if (index >= 0) selected.splice(index, 1)
+    else selected.push(calendar)
+    setDraftValue("calendars", selected)
+  }
+
+  function clearDraftCalendars() {
+    setDraftValue("calendars", [])
+  }
+
+  function applyCalendarOptions(raw) {
+    calendarsLoading = false
+    var text = String(raw || "").trim()
+    if (text === "") {
+      availableCalendars = []
+      calendarsStatusText = ""
+      return
+    }
+
+    try {
+      var parsed = JSON.parse(text)
+      if (!Array.isArray(parsed)) parsed = []
+      availableCalendars = calendarOptionsWithSelected(parsed, [])
+      calendarsStatusText = ""
+    } catch (e) {
+      availableCalendars = []
+      calendarsStatusText = "Could not read calendar list"
+    }
+  }
+
+  function loadCalendarOptions(force) {
+    if (calendarOptionsProcess.running) return
+    if (force !== true && availableCalendars.length > 0) return
+    calendarsLoading = true
+    calendarsStatusText = ""
+    calendarOptionsProcess.command = [listCalendarsScriptPath]
+    calendarOptionsProcess.running = true
+  }
+
   function normalizedSettings(source) {
     var defaults = defaultSettings()
     var next = cloneObject(source, {}) || {}
@@ -158,10 +304,11 @@ BarWidget {
 
     next.scheduleClearText = String(next.scheduleClearText === undefined || next.scheduleClearText === null ? defaults.scheduleClearText : next.scheduleClearText)
     var mode = String(next.meetOpenMode || defaults.meetOpenMode)
-    if (["chrome-app", "system-browser", "custom-command"].indexOf(mode) < 0) mode = defaults.meetOpenMode
+    if (mode === "chrome-app") mode = "system-browser"
+    if (["system-browser", "custom-command"].indexOf(mode) < 0) mode = defaults.meetOpenMode
     next.meetOpenMode = mode
     next.meetOpenCommand = String(next.meetOpenCommand || "")
-    next.chromeAppFlags = String(next.chromeAppFlags === undefined || next.chromeAppFlags === null ? defaults.chromeAppFlags : next.chromeAppFlags)
+    delete next.chromeAppFlags
     next.calendars = normalizeCalendars(next.calendars)
     return next
   }
@@ -182,6 +329,7 @@ BarWidget {
     settingsStatusText = ""
     settingsMode = true
     popupOpen = true
+    loadCalendarOptions(false)
     Qt.callLater(function() { if (keyCatcher) keyCatcher.forceActiveFocus() })
   }
 
@@ -309,8 +457,7 @@ BarWidget {
   }
 
   function tooltipText() {
-    var tip = main.tooltipText || "NextMeeting"
-    return tip + "\nLeft-click: day agenda · Right-click: settings · Middle-click: refresh"
+    return main.tooltipText || "NextMeeting"
   }
 
   visible: main.text !== ""
@@ -350,6 +497,25 @@ BarWidget {
     interval: 900
     repeat: false
     onTriggered: root.refreshFlash = false
+  }
+
+  Timer {
+    interval: 30000
+    running: true
+    repeat: true
+    triggeredOnStart: true
+    onTriggered: root.now = new Date()
+  }
+
+  Process {
+    id: calendarOptionsProcess
+    running: false
+    command: []
+
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.applyCalendarOptions(text)
+    }
   }
 
   IpcHandler {
@@ -458,6 +624,10 @@ BarWidget {
               horizontalAlignment: Text.AlignHCenter
             }
 
+            NowMarker {
+              visible: !root.settingsMode && root.selectedDayIsToday && !main.isLoading && root.dayEvents.length === 0
+            }
+
             SectionCard {
               visible: !root.settingsMode && !main.isLoading && root.dayEvents.length === 0
               title: root.selectedDayOffset === 0 ? "No events today" : "No events"
@@ -474,15 +644,24 @@ BarWidget {
                 id: eventsRepeater
                 model: root.dayEvents
 
-                EventRow {
+                ColumnLayout {
                   required property var modelData
                   required property int index
                   Layout.fillWidth: true
-                  event: modelData
-                  rowIndex: index
-                  selected: root.selectedEventIndex === index
+                  spacing: 6
+
+                  NowMarker { visible: root.nowMarkerIndex === index }
+
+                  EventRow {
+                    Layout.fillWidth: true
+                    event: modelData
+                    rowIndex: index
+                    selected: root.selectedEventIndex === index
+                  }
                 }
               }
+
+              NowMarker { visible: root.nowMarkerIndex === root.dayEvents.length }
             }
 
             AgendaFooter { visible: !root.settingsMode }
@@ -508,6 +687,15 @@ BarWidget {
       font.pixelSize: 15
       font.bold: true
       Layout.fillWidth: true
+      Layout.alignment: Qt.AlignVCenter
+    }
+
+    Text {
+      visible: root.selectedDayIsToday
+      text: "Now " + root.currentTimeLabel
+      color: dim
+      font.family: fontFamily
+      font.pixelSize: 10
       Layout.alignment: Qt.AlignVCenter
     }
 
@@ -712,6 +900,34 @@ BarWidget {
     }
   }
 
+  component NowMarker: RowLayout {
+    Layout.fillWidth: true
+    Layout.leftMargin: 4
+    Layout.rightMargin: 4
+    spacing: 8
+
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: 1
+      color: root.alpha(Color.accent, 0.55)
+    }
+
+    Text {
+      text: "Now · " + root.currentTimeLabel
+      color: Color.accent
+      font.family: fontFamily
+      font.pixelSize: 10
+      font.bold: true
+      Layout.alignment: Qt.AlignVCenter
+    }
+
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: 1
+      color: root.alpha(Color.accent, 0.55)
+    }
+  }
+
   component AgendaFooter: Text {
     Layout.fillWidth: true
     text: "h/l day · j/k select · enter joins selected video meeting · r refresh · s settings · esc close"
@@ -722,20 +938,195 @@ BarWidget {
     wrapMode: Text.WordWrap
   }
 
+  component CalendarSelector: ColumnLayout {
+    Layout.fillWidth: true
+    spacing: 7
+
+    RowLayout {
+      Layout.fillWidth: true
+      spacing: 8
+
+      FieldLabel {
+        text: "Calendars"
+        Layout.fillWidth: true
+      }
+
+      Button {
+        text: root.calendarsLoading ? "Loading…" : "Reload"
+        enabled: !root.calendarsLoading
+        opacity: enabled ? 1.0 : 0.45
+        foreground: root.foreground
+        tooltipText: "Reload calendars from gcalcli"
+        tooltipBackground: root.background
+        tooltipForeground: root.foreground
+        fontFamily: root.fontFamily
+        fontSize: 10
+        horizontalPadding: 7
+        verticalPadding: 4
+        onClicked: root.loadCalendarOptions(true)
+      }
+    }
+
+    Text {
+      Layout.fillWidth: true
+      text: root.selectedCalendarSummary()
+      color: root.selectedCalendarCount() > 0 ? root.foreground : dim
+      font.family: fontFamily
+      font.pixelSize: 10
+      elide: Text.ElideRight
+    }
+
+    Text {
+      visible: root.calendarsStatusText !== ""
+      Layout.fillWidth: true
+      text: root.calendarsStatusText
+      color: urgent
+      font.family: fontFamily
+      font.pixelSize: 10
+      wrapMode: Text.WordWrap
+    }
+
+    Text {
+      visible: root.calendarsLoading && root.calendarOptions.length === 0
+      Layout.fillWidth: true
+      text: "Loading calendars…"
+      color: dim
+      font.family: fontFamily
+      font.pixelSize: 10
+    }
+
+    Text {
+      visible: !root.calendarsLoading && root.calendarOptions.length === 0
+      Layout.fillWidth: true
+      text: "No calendars found. Leave the selection empty to include all calendars."
+      color: dim
+      font.family: fontFamily
+      font.pixelSize: 10
+      wrapMode: Text.WordWrap
+    }
+
+    ColumnLayout {
+      visible: root.calendarOptions.length > 0
+      Layout.fillWidth: true
+      spacing: 5
+
+      Repeater {
+        model: root.calendarOptions
+
+        CalendarOptionRow {
+          required property var modelData
+          Layout.fillWidth: true
+          option: modelData
+        }
+      }
+    }
+
+    Button {
+      visible: root.selectedCalendarCount() > 0
+      text: "Use all calendars"
+      foreground: root.foreground
+      tooltipText: "Clear selected calendars"
+      tooltipBackground: root.background
+      tooltipForeground: root.foreground
+      fontFamily: root.fontFamily
+      fontSize: 10
+      horizontalPadding: 8
+      verticalPadding: 4
+      onClicked: root.clearDraftCalendars()
+    }
+  }
+
+  component CalendarOptionRow: Rectangle {
+    id: optionRow
+    property var option: ({})
+    readonly property string value: String(option.value || option.label || "")
+    readonly property string label: String(option.label || option.value || "")
+    readonly property string description: String(option.description || "")
+    readonly property bool checked: root.calendarSelected(value)
+
+    Layout.fillWidth: true
+    implicitHeight: optionRow.description !== "" ? 46 : 34
+    color: checked ? root.alpha(Color.accent, 0.15) : (optionHover.hovered ? root.cardHover : "transparent")
+    border.color: checked ? root.alpha(Color.accent, 0.55) : root.outline
+    border.width: checked || optionHover.hovered ? 1 : 0
+    radius: Style.cornerRadius
+
+    HoverHandler { id: optionHover }
+
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.toggleDraftCalendar(optionRow.value)
+    }
+
+    RowLayout {
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      anchors.leftMargin: 9
+      anchors.rightMargin: 9
+      spacing: 8
+
+      Rectangle {
+        Layout.preferredWidth: 15
+        Layout.preferredHeight: 15
+        Layout.alignment: Qt.AlignVCenter
+        radius: 4
+        color: optionRow.checked ? Color.accent : "transparent"
+        border.color: optionRow.checked ? Color.accent : root.outline
+        border.width: 1
+
+        Text {
+          anchors.centerIn: parent
+          visible: optionRow.checked
+          text: "✓"
+          color: Color.background
+          font.family: fontFamily
+          font.pixelSize: 10
+          font.bold: true
+        }
+      }
+
+      ColumnLayout {
+        Layout.fillWidth: true
+        Layout.alignment: Qt.AlignVCenter
+        spacing: 1
+
+        Text {
+          Layout.fillWidth: true
+          text: optionRow.label
+          color: root.foreground
+          font.family: fontFamily
+          font.pixelSize: 11
+          elide: Text.ElideRight
+        }
+
+        Text {
+          id: optionDescription
+          visible: optionRow.description !== ""
+          Layout.fillWidth: true
+          text: optionRow.description
+          color: dim
+          font.family: fontFamily
+          font.pixelSize: 9
+          elide: Text.ElideRight
+        }
+      }
+    }
+  }
+
   component SettingsContent: ColumnLayout {
     id: settingsRoot
     Layout.fillWidth: true
     spacing: 10
 
-    readonly property bool customOpen: root.draftValue("meetOpenMode", "chrome-app") === "custom-command"
-    readonly property bool chromeOpen: root.draftValue("meetOpenMode", "chrome-app") === "chrome-app"
+    readonly property bool customOpen: root.draftValue("meetOpenMode", "system-browser") === "custom-command"
     readonly property bool editorActive: refreshIntervalField.field.activeFocus
       || lookaheadField.field.activeFocus
       || maxCharsField.field.activeFocus
       || clearTextField.activeFocus
-      || calendarsField.activeFocus
       || customCommandField.activeFocus
-      || chromeFlagsField.activeFocus
 
     SectionCard {
       title: "Calendar"
@@ -772,15 +1163,7 @@ BarWidget {
           onModified: function(value) { root.setDraftValue("lookaheadDays", value) }
         }
 
-        FieldLabel { text: "Calendars" }
-        TextField {
-          id: calendarsField
-          Layout.fillWidth: true
-          text: root.calendarsText(root.draftValue("calendars", []))
-          placeholderText: "Blank = all calendars; otherwise comma-separated names"
-          foreground: root.foreground
-          onTextChanged: if (text !== root.calendarsText(root.draftValue("calendars", []))) root.setDraftValue("calendars", text)
-        }
+        CalendarSelector { Layout.fillWidth: true }
       }
     }
 
@@ -819,7 +1202,7 @@ BarWidget {
 
     SectionCard {
       title: "Join links"
-      subtitle: "Meet links can open in a Chrome app window. Zoom and other providers use the system handler unless you choose a custom command."
+      subtitle: "Open meeting links in your default browser, or provide a custom command."
 
       ColumnLayout {
         width: parent.width
@@ -828,11 +1211,10 @@ BarWidget {
         ButtonGroup {
           Layout.fillWidth: true
           options: [
-            { value: "chrome-app", label: "Meet app" },
             { value: "system-browser", label: "Browser" },
             { value: "custom-command", label: "Custom" }
           ]
-          value: String(root.draftValue("meetOpenMode", "chrome-app"))
+          value: String(root.draftValue("meetOpenMode", "system-browser"))
           foreground: root.foreground
           background: "transparent"
           accent: Color.accent
@@ -855,23 +1237,6 @@ BarWidget {
             placeholderText: "firefox --new-window \"$NEXT_MEETING_URL\""
             foreground: root.foreground
             onTextChanged: if (text !== root.draftValue("meetOpenCommand", "")) root.setDraftValue("meetOpenCommand", text)
-          }
-        }
-
-        ColumnLayout {
-          Layout.fillWidth: true
-          spacing: 6
-          enabled: settingsRoot.chromeOpen
-          opacity: enabled ? 1.0 : 0.45
-
-          FieldLabel { text: "Chrome app flags" }
-          TextField {
-            id: chromeFlagsField
-            Layout.fillWidth: true
-            text: String(root.draftValue("chromeAppFlags", ""))
-            placeholderText: "Optional flags passed to Chrome for Google Meet"
-            foreground: root.foreground
-            onTextChanged: if (text !== root.draftValue("chromeAppFlags", "")) root.setDraftValue("chromeAppFlags", text)
           }
         }
       }

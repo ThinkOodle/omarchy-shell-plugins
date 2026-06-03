@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "next-meeting",
   "name": "NextMeeting",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": "Tyler Barnett",
   "license": "MIT",
   "description": "Shows your next Meet/Zoom event in the Omarchy bar with a full-day agenda popup.",
@@ -21,9 +21,8 @@
       "scheduleClearText": "No more meetings today ✅",
       "lookaheadDays": 7,
       "maxDisplayChars": 42,
-      "meetOpenMode": "chrome-app",
+      "meetOpenMode": "system-browser",
       "meetOpenCommand": "",
-      "chromeAppFlags": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing",
       "calendars": []
     },
     "schema": [
@@ -68,9 +67,9 @@
         "key": "meetOpenMode",
         "type": "enum",
         "label": "Meeting open mode",
-        "description": "How NextMeeting opens join links. Chrome app mode applies to Google Meet; Zoom and other providers use the system URL handler unless custom-command is selected.",
-        "options": ["chrome-app", "system-browser", "custom-command"],
-        "defaultValue": "chrome-app"
+        "description": "How NextMeeting opens join links. Use the default browser or a custom command.",
+        "options": ["system-browser", "custom-command"],
+        "defaultValue": "system-browser"
       },
       {
         "key": "meetOpenCommand",
@@ -78,13 +77,6 @@
         "label": "Custom open command",
         "description": "Used only when Meeting open mode is custom-command. The join URL is available as $NEXT_MEETING_URL and $MEETING_URL.",
         "defaultValue": ""
-      },
-      {
-        "key": "chromeAppFlags",
-        "type": "string",
-        "label": "Chrome app flags",
-        "description": "Space-separated flags passed to Chrome for Google Meet chrome-app mode. Defaults work around common Wayland/GPU quirks on Hyprland; clear this if Chrome runs well natively for you.",
-        "defaultValue": "--ozone-platform=x11 --disable-features=WaylandWpColorManagerV1 --disable-gpu-compositing"
       },
       {
         "key": "calendars",
