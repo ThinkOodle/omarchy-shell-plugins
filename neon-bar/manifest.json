@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "demo.neon-bar",
+  "name": "Neon Demo Bar",
+  "version": "1.0.0",
+  "author": "Omarchy",
+  "description": "A visibly different full-bar replacement that demonstrates the bar option API.",
+  "kinds": ["bar"],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

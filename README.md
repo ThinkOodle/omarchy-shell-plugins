@@ -53,6 +53,22 @@ Dependencies:
 - `wev` for button sniffing
 - Python `evdev` module for physical-button release detection
 
+### `neon-bar`
+
+A full replacement bar option for Omarchy Shell. It uses the new `kind: "bar"`
+plugin contract, renders the user's configured bar widgets inside a visibly
+different floating neon pill/rail, and documents the compatibility surface for
+building custom bars.
+
+Features:
+
+- Full-bar replacement selected with `omarchy config shell bar use demo.neon-bar`
+- Floating translucent pill/rail chrome so it is visually distinct
+- Reuses `bar.layout` widgets from `~/.config/omarchy/shell.json`
+- Supports dragging widgets to reorder them in `shell.json`
+- Respects `bar.position` and `omarchy toggle bar`
+- Provides a documented minimal API for widget compatibility
+
 ### `next-meeting`
 
 Shows your next joinable video meeting in the Omarchy bar, with a full-day agenda popup.
@@ -75,40 +91,21 @@ Dependencies:
 
 Settings live in `~/.config/omarchy/shell.json` and can be edited inline by right-clicking the widget. Exposes `show`, `toggle`, `refresh`, `open`/`join`, and `settings` over Omarchy shell IPC on the `next-meeting` target.
 
-## Install locally
+## Install
+
+Add this repository as a trusted Omarchy plugin source once:
 
 ```bash
-mkdir -p ~/.config/omarchy/plugins
-ln -s ~/Work/omarchy-shell-plugins/model-usage ~/.config/omarchy/plugins/model-usage
-omarchy shell shell setPluginEnabled model-usage true
-omarchy restart shell
+omarchy plugin source add https://github.com/thinkoodle/omarchy-shell-plugins
+omarchy plugin available
 ```
 
-If the plugin already exists, remove it first:
+Then add and enable the plugin you want.
+
+Install `orbit`:
 
 ```bash
-rm -rf ~/.config/omarchy/plugins/model-usage
-```
-
-Install `tailscale` locally:
-
-```bash
-mkdir -p ~/.config/omarchy/plugins
-ln -s ~/Work/omarchy-shell-plugins/tailscale ~/.config/omarchy/plugins/tailscale
-omarchy-shell shell rescanPlugins
-omarchy-shell shell setPluginEnabled tailscale true
-```
-
-Then add `{ "id": "tailscale" }` to one of the `bar.layout` sections in `~/.config/omarchy/shell.json` (or use Omarchy's bar settings UI), and restart the shell.
-
-Install `orbit` locally:
-
-```bash
-mkdir -p ~/.config/omarchy/plugins
-ln -s ~/Work/omarchy-shell-plugins/orbit ~/.config/omarchy/plugins/orbit
-omarchy plugin rescan
-omarchy plugin enable orbit
-omarchy restart shell
+omarchy plugin add orbit --enable
 ```
 
 Then sniff your mouse button and bind it:
@@ -119,19 +116,36 @@ Then sniff your mouse button and bind it:
 
 See `orbit/README.md` for the Hyprland binding and ring configuration.
 
-Install `next-meeting` locally:
+Install `neon-bar` and make it the active bar option:
 
 ```bash
-mkdir -p ~/.config/omarchy/plugins
-ln -s ~/Work/omarchy-shell-plugins/next-meeting ~/.config/omarchy/plugins/next-meeting
-omarchy shell shell setPluginEnabled next-meeting true
-omarchy restart shell
+omarchy plugin add demo.neon-bar --enable
 ```
 
-If a plugin already exists, remove it first:
+Return to the built-in bar:
 
 ```bash
-rm -rf ~/.config/omarchy/plugins/<plugin-id>
+omarchy config shell bar reset
+```
+
+See `neon-bar/README.md` for the replacement-bar development contract.
+
+Install `next-meeting`:
+
+```bash
+omarchy plugin add next-meeting --enable
+```
+
+Arrange it afterward if desired:
+
+```bash
+omarchy plugin bar move next-meeting --section left --after omarchy.workspaces
+```
+
+If a plugin does not appear immediately, reload the shell:
+
+```bash
+omarchy restart shell
 ```
 
 ## Optional synced aggregation
