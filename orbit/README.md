@@ -4,19 +4,21 @@ Orbit is an Omarchy shell overlay plugin for cursor-centered radial menus. It op
 
 ## Install
 
+Add this repository as a trusted Omarchy plugin source once:
+
 ```bash
-mkdir -p ~/.config/omarchy/plugins
-ln -s ~/Work/omarchy-shell-plugins/orbit ~/.config/omarchy/plugins/orbit
-omarchy plugin rescan
-omarchy plugin enable orbit
-omarchy restart shell
+omarchy plugin source add https://github.com/thinkoodle/omarchy-shell-plugins
 ```
 
-Low-level equivalent:
+Then add and enable Orbit:
 
 ```bash
-omarchy-shell shell rescanPlugins
-omarchy-shell shell setPluginEnabled orbit true
+omarchy plugin add orbit --enable
+```
+
+If it does not appear immediately, reload the shell:
+
+```bash
 omarchy restart shell
 ```
 

@@ -24,18 +24,23 @@ It uses [`gcalcli`](https://github.com/insanum/gcalcli) to read Google Calendar 
 
 ## Install
 
-Place this plugin at:
+Add this repository as a trusted Omarchy plugin source once:
 
-```text
-~/.config/omarchy/plugins/next-meeting
+```bash
+omarchy plugin source add https://github.com/thinkoodle/omarchy-shell-plugins
 ```
 
-Then add `next-meeting` to your bar layout in `~/.config/omarchy/shell.json`:
+Then add and enable NextMeeting. Because it is a bar widget, enabling it adds it
+to your bar layout:
 
-```json
-{
-  "id": "next-meeting"
-}
+```bash
+omarchy plugin add next-meeting --enable
+```
+
+Arrange it afterward if desired:
+
+```bash
+omarchy plugin bar move next-meeting --section left --after omarchy.workspaces
 ```
 
 Restart the shell if it does not appear automatically:
