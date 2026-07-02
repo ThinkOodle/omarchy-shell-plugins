@@ -91,6 +91,27 @@ Dependencies:
 
 Settings live in `~/.config/omarchy/shell.json` and can be edited inline by right-clicking the widget. Exposes `show`, `toggle`, `refresh`, `open`/`join`, and `settings` over Omarchy shell IPC on the `next-meeting` target.
 
+### `port-forward`
+
+Manage SSH port forwards from the Omarchy bar — no `ssh -L …` terminal to babysit.
+
+Features:
+
+- Toggle SSH tunnels on/off from a keyboard-friendly popup, with live status dots (`○` off · `◐` connecting · `●` on · `✕` error)
+- Add / edit / delete forwards inline (label, local port, SSH host, remote bind host, remote port, autostart, extra ssh options)
+- Bounce a local port between hosts: turning one on atomically stops any other forward on the same local port
+- Tunnels run as transient systemd user services (`omarchy-pf-<id>.service`), so they **survive a shell reload/crash** and are reconciled back to "active" on startup
+- "Active" is only shown once the local port is actually listening; failures surface the ssh error from the journal
+- Keyboard controls: `j`/`k` move, `Enter` toggles, `a` add, `e` edit, `x` delete, `r` refresh, `Esc` close
+
+Dependencies:
+
+- `ssh` (OpenSSH client) with non-interactive auth (key + agent)
+- systemd user session (`systemd-run --user`, `systemctl --user`, `journalctl`)
+- `ss` (iproute2)
+
+Forward definitions live in `~/.config/omarchy/port-forwards.json` (watched). Exposes `open`, `close`, `toggle`, `list`, `statuses`, `on`, `off`, and `toggleForward` over Omarchy shell IPC on the `port-forward` target. See `port-forward/README.md` for details.
+
 ## Install
 
 Add this repository as a trusted Omarchy plugin source once:
@@ -140,6 +161,13 @@ Arrange it afterward if desired:
 
 ```bash
 omarchy plugin bar move next-meeting --section left --after omarchy.workspaces
+```
+
+Install `port-forward`:
+
+```bash
+omarchy plugin add port-forward --enable
+omarchy plugin bar add port-forward
 ```
 
 If a plugin does not appear immediately, reload the shell:
